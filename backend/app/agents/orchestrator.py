@@ -23,7 +23,6 @@ class FraudAnalysisOrchestrator:
     """
 
     async def run_fraud_analysis_pipeline(self, db: AsyncSession, claim_id: str) -> Claim:
-        # Load claim with evidence
         stmt = select(Claim).where(Claim.id == claim_id)
         result = await db.execute(stmt)
         claim = result.scalars().first()
@@ -70,11 +69,11 @@ class FraudAnalysisOrchestrator:
                     ev.extracted_data = extracted
                     ev.confidence = conf
                     ev.extraction_status = "COMPLETED"
+                    ev.provider_mode = "LOCAL HEURISTIC PARSER"
                     extracted_docs[doc_t] = extracted
                     evidence_id_map[doc_t] = ev.id
 
                     if prompt_injected:
-                        # Add a document integrity fraud signal
                         sig = FraudSignal(
                             id=f"SIG-{uuid.uuid4().hex[:8].upper()}",
                             claim_id=claim.id,
@@ -93,6 +92,7 @@ class FraudAnalysisOrchestrator:
                     ev.extracted_data = photo_ext.model_dump()
                     ev.confidence = photo_ext.confidence
                     ev.extraction_status = "COMPLETED"
+                    ev.provider_mode = "LOCAL DEMO / MOCK"
                     photo_extractions.append(photo_ext)
                     evidence_id_map[f"photo_{len(photo_extractions)}"] = ev.id
 
@@ -123,10 +123,11 @@ class FraudAnalysisOrchestrator:
 
             # 4. Persist Fraud Signals to DB
             for s in all_raw_signals:
+                sig_type = s.get("signal_type") or s.get("type", "UNKNOWN_SIGNAL")
                 sig_model = FraudSignal(
                     id=f"SIG-{uuid.uuid4().hex[:8].upper()}",
                     claim_id=claim.id,
-                    signal_type=s.get("signal_type") or s.get("type"),
+                    signal_type=sig_type,
                     category=s.get("category", "HISTORICAL_ANOMALY"),
                     severity=s.get("severity", "MEDIUM"),
                     score_impact=float(s.get("score_impact", 10.0)),
@@ -141,8 +142,21 @@ class FraudAnalysisOrchestrator:
                 all_raw_signals, claim.claimed_amount
             )
 
+            # Store original immutable AI scores
+            claim.ai_risk_score = score
+            claim.ai_risk_level = level
+            claim.final_risk_score = score
+            claim.final_risk_level = level
             claim.risk_score = score
             claim.risk_level = level
+
+            # Identify top signal for queue display safely
+            sorted_signals = sorted(all_raw_signals, key=lambda x: x.get("score_impact", 0.0), reverse=True)
+            if sorted_signals:
+                top_s = sorted_signals[0]
+                claim.top_signal = top_s.get("signal_type") or top_s.get("type", "ANOMALY_DETECTED")
+            else:
+                claim.top_signal = "NO_ADVERSE_SIGNALS"
 
             assessment = RiskAssessment(
                 id=f"RSK-{uuid.uuid4().hex[:8].upper()}",
@@ -158,7 +172,6 @@ class FraudAnalysisOrchestrator:
             # 6. Automatic Routing
             if level in ["HIGH", "CRITICAL"]:
                 claim.status = "REVIEW_REQUIRED"
-                # Check if case already exists
                 case_stmt = select(InvestigationCase).where(InvestigationCase.claim_id == claim.id)
                 case_res = await db.execute(case_stmt)
                 existing_case = case_res.scalars().first()
@@ -169,6 +182,10 @@ class FraudAnalysisOrchestrator:
                         claim_id=claim.id,
                         status="QUEUED",
                         priority="URGENT" if level == "CRITICAL" else "HIGH",
+                        assigned_to="SIU Senior Investigator",
+                        original_ai_score=score,
+                        original_ai_level=level,
+                        final_effective_score=score,
                         investigator_notes=[{
                             "author": "System AI Orchestrator",
                             "text": f"Automated routing triggered. Assessed as {level} risk ({score}/100). {len(all_raw_signals)} signal(s) flagged for human investigation.",
@@ -176,15 +193,22 @@ class FraudAnalysisOrchestrator:
                         }]
                     )
                     db.add(inv_case)
+                    claim.assigned_investigator = "SIU Senior Investigator"
             else:
                 claim.status = "NORMAL_PROCESSING"
+                claim.assigned_investigator = "Automated STP"
 
             await db.commit()
 
             # Audit Logging
             await log_audit_event(
                 db, "orchestrator", "ANALYSIS_COMPLETED", "claim", claim.id,
-                new_value={"status": claim.status, "risk_score": score, "risk_level": level, "signal_count": len(all_raw_signals)}
+                new_value={
+                    "status": claim.status,
+                    "ai_risk_score": score,
+                    "ai_risk_level": level,
+                    "signal_count": len(all_raw_signals)
+                }
             )
 
             return claim

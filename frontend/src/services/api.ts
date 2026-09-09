@@ -41,6 +41,14 @@ export const claimsApi = {
     const res = await api.get<AuditLog[]>(`/claims/${claimId}/audit-trail`);
     return res.data;
   },
+
+  syncExternalClaims: async (claimId: string, systemName = "Guidewire ClaimCenter (Mock Adapter)") => {
+    const res = await api.post(`/external-claims/sync/${claimId}`, {
+      external_system: systemName,
+      target_environment: "mock_simulation",
+    });
+    return res.data;
+  },
 };
 
 export const investigationApi = {

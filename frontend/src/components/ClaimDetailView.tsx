@@ -8,17 +8,18 @@ import {
   AlertTriangle,
   History,
   Car,
-  DollarSign,
   Calendar,
   MapPin,
-  Eye,
   SlidersHorizontal,
   Send,
   Camera,
-  Layers,
-  Scale
+  Scale,
+  Cpu,
+  UserCog,
+  UserCheck,
+  ExternalLink
 } from "lucide-react";
-import { ClaimDetail, FraudSignal, Evidence, AuditLog } from "../types";
+import { ClaimDetail, Evidence, AuditLog } from "../types";
 import { investigationApi, claimsApi } from "../services/api";
 
 interface ClaimDetailViewProps {
@@ -32,15 +33,16 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
   onBack,
   onRefresh,
 }) => {
-  const [activeTab, setActiveTab] = useState<"overview" | "signals" | "evidence" | "investigation" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "evidence" | "investigation" | "audit">("overview");
   const [noteText, setNoteText] = useState("");
-  const [overrideScore, setOverrideScore] = useState<number>(claim.risk_score || 50);
+  const [overrideScore, setOverrideScore] = useState<number>(claim.override_risk_score ?? claim.final_risk_score ?? claim.risk_score ?? 50);
   const [overrideReason, setOverrideReason] = useState("");
   const [decisionReason, setDecisionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
 
   const riskAssessment = claim.risk_assessments?.[0];
   const investigationCase = claim.investigation_case;
@@ -69,7 +71,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
     setActionLoading(true);
     try {
       await investigationApi.overrideRisk(claim.id, Number(overrideScore), overrideReason, "SIU Supervisor");
-      alert("AI Risk Score overridden and logged to immutable audit trail.");
+      alert("Score overridden! Original AI baseline is preserved, and human override is now active.");
       setOverrideReason("");
       onRefresh();
     } catch (err) {
@@ -93,6 +95,18 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
       alert("Failed to submit decision");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleExternalSync = async () => {
+    setSyncLoading(true);
+    try {
+      const res = await claimsApi.syncExternalClaims(claim.id);
+      alert(`Synced with ${res.external_reference_id} (${res.sync_status}): ${res.message}`);
+    } catch (err) {
+      alert("Failed to sync claim with external system.");
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -129,6 +143,13 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
     return "bg-emerald-500";
   };
 
+  const aiScore = claim.ai_risk_score ?? claim.risk_score ?? 0;
+  const aiLevel = claim.ai_risk_level ?? claim.risk_level ?? "LOW";
+  const overrideScoreVal = claim.override_risk_score;
+  const overrideLevelVal = claim.override_risk_level;
+  const effectiveScore = claim.final_risk_score ?? claim.risk_score ?? 0;
+  const effectiveLevel = claim.final_risk_level ?? claim.risk_level ?? "LOW";
+
   return (
     <div className="space-y-6">
       {/* Top Action Bar */}
@@ -146,8 +167,28 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
           <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-slate-800 text-slate-200 border border-slate-700">
             {claim.status}
           </span>
+          <button
+            onClick={handleExternalSync}
+            disabled={syncLoading}
+            className="flex items-center space-x-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-md text-xs font-semibold transition"
+            title="Sync with Guidewire / Duck Creek Mock Adapter"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>{syncLoading ? "Syncing..." : "Sync Core Claims (Mock)"}</span>
+          </button>
         </div>
       </div>
+
+      {/* Top Signal Highlight Banner (If Present) */}
+      {claim.top_signal && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 flex items-start space-x-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <span className="font-bold text-amber-300 uppercase tracking-wide mr-2">Top Red Flag Signal:</span>
+            <span className="text-slate-200">{claim.top_signal}</span>
+          </div>
+        </div>
+      )}
 
       {/* Hero Claim Dossier Card */}
       <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -155,21 +196,28 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
           <div className="space-y-2">
             <div className="flex items-center space-x-3">
               <h1 className="text-2xl font-extrabold text-white tracking-tight">{claim.id}</h1>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${getRiskColor(claim.risk_level)}`}>
-                {claim.risk_level} RISK
+              <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${getRiskColor(effectiveLevel)}`}>
+                {effectiveLevel} RISK
               </span>
-              {investigationCase?.ai_risk_overridden && (
-                <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-semibold">
-                  HUMAN OVERRIDE APPLIED
+              {overrideScoreVal !== null && overrideScoreVal !== undefined && (
+                <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-semibold flex items-center space-x-1">
+                  <UserCheck className="w-3 h-3" />
+                  <span>HUMAN OVERRIDE ACTIVE</span>
                 </span>
               )}
             </div>
             <p className="text-sm text-slate-300 flex items-center space-x-2">
               <span className="font-semibold text-white">{claim.claimant_name}</span>
-              <span className="text-slate-500">•</span>
+              <span className="text-slate-500">â€¢</span>
               <span>Policy: {claim.policy_id}</span>
-              <span className="text-slate-500">•</span>
+              <span className="text-slate-500">â€¢</span>
               <span>Claimant ID: {claim.claimant_id}</span>
+              {claim.assigned_investigator && (
+                <>
+                  <span className="text-slate-500">â€¢</span>
+                  <span className="text-blue-400">Assigned: {claim.assigned_investigator}</span>
+                </>
+              )}
             </p>
             <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-1">
               <span className="flex items-center space-x-1">
@@ -187,28 +235,73 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
             </div>
           </div>
 
-          {/* Risk Gauge Box */}
-          <div className="bg-slate-900/90 border border-slate-700/60 rounded-xl p-4 min-w-[260px]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">AI Fraud Risk Score</span>
-              <span className="text-2xl font-black text-white">{claim.risk_score?.toFixed(0)}<span className="text-xs text-slate-400 font-normal"> / 100</span></span>
+          {/* Explicit 3-Tier Score Separation Panel */}
+          <div className="flex flex-wrap sm:flex-nowrap gap-3 items-stretch">
+            {/* 1. Original AI Score */}
+            <div className="bg-slate-900/90 border border-slate-700/60 rounded-xl p-3 min-w-[150px] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">
+                <span className="flex items-center space-x-1">
+                  <Cpu className="w-3 h-3 text-blue-400" />
+                  <span>Original AI</span>
+                </span>
+                <span className={`px-1.5 py-0.2 rounded text-[9px] border ${getRiskColor(aiLevel)}`}>
+                  {aiLevel}
+                </span>
+              </div>
+              <div className="text-xl font-black text-white my-1">
+                {aiScore.toFixed(0)}<span className="text-xs text-slate-500 font-normal"> / 100</span>
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono">
+                Immutable Model
+              </div>
             </div>
-            <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full ${getScoreBarColor(claim.risk_score || 0)} transition-all duration-700`}
-                style={{ width: `${Math.min(100, Math.max(5, claim.risk_score || 5))}%` }}
-              />
+
+            {/* 2. Human Override */}
+            <div className="bg-slate-900/90 border border-slate-700/60 rounded-xl p-3 min-w-[150px] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-1">
+                <span className="flex items-center space-x-1">
+                  <UserCog className="w-3 h-3 text-purple-400" />
+                  <span>Override</span>
+                </span>
+                {overrideLevelVal && (
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] border ${getRiskColor(overrideLevelVal)}`}>
+                    {overrideLevelVal}
+                  </span>
+                )}
+              </div>
+              <div className="text-xl font-black text-purple-300 my-1">
+                {overrideScoreVal !== null && overrideScoreVal !== undefined ? (
+                  <>{overrideScoreVal.toFixed(0)}<span className="text-xs text-slate-500 font-normal"> / 100</span></>
+                ) : (
+                  <span className="text-xs text-slate-500 font-medium">None (Using AI)</span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-500 truncate max-w-[130px]" title={investigationCase?.override_reason || "No manual override"}>
+                {investigationCase?.override_reason || "Automated Risk Active"}
+              </div>
             </div>
-            <div className="flex justify-between text-[10px] text-slate-500 mt-1 font-medium">
-              <span>0 (Legit)</span>
-              <span>30 (Low)</span>
-              <span>60 (Med)</span>
-              <span>80 (High)</span>
-              <span>100 (Crit)</span>
-            </div>
-            <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-              <span className="text-slate-400">Claimed Amount:</span>
-              <span className="font-bold text-white">${claim.claimed_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+
+            {/* 3. Effective Final Risk Gauge */}
+            <div className="bg-slate-900/90 border border-blue-500/30 rounded-xl p-3 min-w-[190px] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-1">
+                <span className="flex items-center space-x-1">
+                  <Scale className="w-3 h-3 text-emerald-400" />
+                  <span>Effective Risk</span>
+                </span>
+                <span className="text-xs font-bold text-white">${claim.claimed_amount.toLocaleString()}</span>
+              </div>
+              <div className="flex items-baseline justify-between my-1">
+                <span className="text-2xl font-black text-white">{effectiveScore.toFixed(0)}<span className="text-xs text-slate-400 font-normal"> / 100</span></span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getRiskColor(effectiveLevel)}`}>
+                  {effectiveLevel}
+                </span>
+              </div>
+              <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                <div
+                  className={`h-full rounded-full ${getScoreBarColor(effectiveScore)} transition-all duration-700`}
+                  style={{ width: `${Math.min(100, Math.max(5, effectiveScore))}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -271,7 +364,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
             {/* Fraud Signals List */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                Triggered Fraud Signals ({claim.fraud_signals?.length || 0})
+                Triggered Fraud Signals & Deterministic Rules ({claim.fraud_signals?.length || 0})
               </h3>
               {(!claim.fraud_signals || claim.fraud_signals.length === 0) ? (
                 <div className="p-8 text-center bg-slate-800/40 rounded-xl border border-slate-800 text-slate-400 text-sm">
@@ -282,7 +375,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                 claim.fraud_signals.map((sig) => (
                   <div
                     key={sig.id}
-                    className="p-4 rounded-xl bg-slate-800/70 border border-slate-700/70 hover:border-slate-600 transition space-y-2"
+                    className="p-4 rounded-xl bg-slate-800/70 border border-slate-700/70 hover:border-slate-600 transition space-y-2.5"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
@@ -295,6 +388,26 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                       <span className="text-xs font-bold text-rose-400">+{sig.score_impact} pts</span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">{sig.description}</p>
+
+                    {/* Structured Rule Metadata Details (if present) */}
+                    {sig.metadata_json && sig.metadata_json.rule_id && (
+                      <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-700/60 text-xs space-y-1">
+                        <div className="flex items-center justify-between font-mono text-[11px] text-blue-400 font-bold">
+                          <span>Rule ID: {sig.metadata_json.rule_id}</span>
+                          <span className="text-slate-400 font-normal">Threshold: {sig.metadata_json.threshold}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-300">
+                          <span className="text-slate-500 font-medium">Observed Value: </span>
+                          <span className="font-semibold text-amber-300">{String(sig.metadata_json.observed_value)}</span>
+                        </div>
+                        {sig.metadata_json.explanation && (
+                          <div className="text-[11px] text-slate-400 italic">
+                            {sig.metadata_json.explanation}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {sig.evidence_refs && sig.evidence_refs.length > 0 && (
                       <div className="flex items-center space-x-2 pt-1">
                         <span className="text-[11px] text-slate-500 font-medium">Evidence Anchors:</span>
@@ -318,7 +431,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
           <div className="space-y-6">
             <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-                Score Multi-Agent Breakdown
+                Multi-Agent Score Breakdown
               </h3>
               {riskAssessment?.score_breakdown && (
                 <div className="space-y-3 text-xs">
@@ -397,7 +510,12 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                 <div className="text-[11px] text-slate-400 space-y-1">
                   <p>SHA-256: <span className="font-mono text-[9px] text-slate-500">{ev.sha256_hash.slice(0, 16)}...</span></p>
                   <p>Extraction Confidence: <span className="font-semibold text-emerald-400">{(ev.confidence * 100).toFixed(0)}%</span></p>
-                  <p>Status: <span className="text-white font-medium">{ev.extraction_status}</span></p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-white font-medium">{ev.extraction_status}</span>
+                    <span className="text-[9px] bg-slate-900 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">
+                      {ev.provider_mode || "LOCAL DEMO / MOCK"}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -414,7 +532,9 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                       {selectedEvidence.id}
                     </span>
                   </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">MIME: {selectedEvidence.mime_type} • Size: {(selectedEvidence.file_size_bytes / 1024).toFixed(1)} KB</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    MIME: {selectedEvidence.mime_type} â€¢ Size: {(selectedEvidence.file_size_bytes / 1024).toFixed(1)} KB â€¢ Mode: {selectedEvidence.provider_mode || "LOCAL DEMO / MOCK"}
+                  </p>
                 </div>
                 <button
                   onClick={() => setSelectedEvidence(null)}
@@ -444,7 +564,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
           {/* Notes & Collaboration */}
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-              Investigator Notes & Audit Log
+              Investigator Notes & Collaboration
             </h3>
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {(!investigationCase?.investigator_notes || investigationCase.investigator_notes.length === 0) ? (
@@ -485,16 +605,21 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
           <div className="space-y-6">
             {/* AI Risk Override */}
             <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-                Override AI Risk Assessment
-              </h3>
-              <p className="text-xs text-slate-400">
-                Human investigators may adjust the automated score when physical inspection or subpoenaed records counter the AI model.
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+                  Override AI Risk Assessment
+                </h3>
+                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded border border-purple-500/30">
+                  Preserves AI Baseline
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Human investigators may adjust the effective score when physical inspection or subpoenaed records counter the automated model. The original AI baseline ({aiScore.toFixed(0)}) remains untouched.
               </p>
               <form onSubmit={handleOverrideScore} className="space-y-3 pt-1">
                 <div>
                   <label className="text-xs font-medium text-slate-300 block mb-1">
-                    New Score (0 - 100): {overrideScore}
+                    New Effective Score (0 - 100): <span className="font-bold text-purple-400">{overrideScore}</span>
                   </label>
                   <input
                     type="range"
@@ -502,7 +627,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                     max="100"
                     value={overrideScore}
                     onChange={(e) => setOverrideScore(Number(e.target.value))}
-                    className="w-full h-2 bg-slate-900 rounded-lg cursor-pointer accent-blue-500"
+                    className="w-full h-2 bg-slate-900 rounded-lg cursor-pointer accent-purple-500"
                   />
                 </div>
                 <div>
@@ -513,7 +638,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                     required
                     value={overrideReason}
                     onChange={(e) => setOverrideReason(e.target.value)}
-                    placeholder="Document exact reason for overriding AI recommendation..."
+                    placeholder="Document exact reason for overriding automated risk..."
                     rows={2}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
@@ -563,7 +688,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                   <button
                     onClick={() => handleFinalDecision("ESCALATED_LEGAL")}
                     disabled={actionLoading}
-                    className="flex items-center space-x-1 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition"
+                    className="flex items-center space-x-1 px-3 py-2 bg-amber-600 hover:amber-500 text-white rounded-lg text-xs font-bold transition"
                   >
                     <AlertTriangle className="w-4 h-4" />
                     <span>Escalate to Legal / SIU</span>
@@ -594,7 +719,7 @@ export const ClaimDetailView: React.FC<ClaimDetailViewProps> = ({
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
                       <span className="font-mono text-blue-400 font-bold">{log.action}</span>
-                      <span className="text-slate-500">•</span>
+                      <span className="text-slate-500">â€¢</span>
                       <span className="text-slate-300 font-medium">{log.actor}</span>
                     </div>
                     {log.new_value && (

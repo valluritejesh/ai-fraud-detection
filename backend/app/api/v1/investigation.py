@@ -67,7 +67,7 @@ async def add_investigation_note(
 
     await log_audit_event(
         db, payload.author or "SIU Investigator", "INVESTIGATOR_NOTE_ADDED",
-        "investigation", case.id, new_value={"note": payload.text}
+        "claim", claim_id, new_value={"note": payload.text}
     )
     await db.commit()
     await db.refresh(case)
@@ -86,29 +86,48 @@ async def override_ai_risk(
         raise HTTPException(status_code=404, detail="Investigation case not found")
 
     claim = await db.get(Claim, claim_id)
-    old_score = claim.risk_score
-    old_level = claim.risk_level
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
 
-    case.ai_risk_overridden = True
-    case.override_score = payload.override_score
-    case.override_reason = payload.override_reason
-
-    # Adjust claim risk level based on override
-    claim.risk_score = payload.override_score
-    if payload.override_score <= 30.0:
-        claim.risk_level = "LOW"
-    elif payload.override_score <= 60.0:
-        claim.risk_level = "MEDIUM"
-    elif payload.override_score <= 80.0:
-        claim.risk_level = "HIGH"
+    # Determine risk level corresponding to override score
+    new_score = payload.override_score
+    if new_score <= 30.0:
+        new_level = "LOW"
+    elif new_score <= 60.0:
+        new_level = "MEDIUM"
+    elif new_score <= 80.0:
+        new_level = "HIGH"
     else:
-        claim.risk_level = "CRITICAL"
+        new_level = "CRITICAL"
+
+    # 1. Update Investigation Case
+    case.ai_risk_overridden = True
+    case.override_score = new_score
+    case.override_reason = payload.override_reason
+    case.final_effective_score = new_score
+    case.status = "IN_REVIEW"
+
+    # 2. Update Claim: KEEP original AI score completely intact!
+    claim.override_risk_score = new_score
+    claim.override_risk_level = new_level
+    claim.final_risk_score = new_score
+    claim.final_risk_level = new_level
+    
+    # Backwards compatibility aliases reflect the human determination
+    claim.risk_score = new_score
+    claim.risk_level = new_level
 
     await log_audit_event(
         db, payload.investigator or "Lead Investigator", "AI_RISK_OVERRIDDEN",
         "claim", claim.id,
-        old_value={"score": old_score, "level": old_level},
-        new_value={"score": payload.override_score, "level": claim.risk_level, "reason": payload.override_reason}
+        old_value={"original_ai_score": claim.ai_risk_score, "original_ai_level": claim.ai_risk_level},
+        new_value={
+            "override_score": new_score,
+            "override_level": new_level,
+            "final_score": new_score,
+            "rationale": payload.override_reason,
+            "investigator": payload.investigator
+        }
     )
     await db.commit()
     await db.refresh(case)
@@ -124,7 +143,6 @@ async def submit_final_decision(
     res = await db.execute(stmt)
     case = res.scalars().first()
     if not case:
-        # Create case if finalizing a non-investigation claim
         case = InvestigationCase(
             id=f"CASE-{uuid.uuid4().hex[:8].upper()}",
             claim_id=claim_id,
@@ -143,13 +161,13 @@ async def submit_final_decision(
     case.decided_at = datetime.datetime.utcnow()
     case.status = "RESOLVED"
 
-    # Update claim status
+    # Update claim workflow status
     claim.status = f"FINAL_DECISION_{payload.decision}"
 
     await log_audit_event(
         db, payload.decided_by or "Claims Supervisor", "FINAL_HUMAN_DECISION",
         "claim", claim.id,
-        new_value={"decision": payload.decision, "reason": payload.reason}
+        new_value={"decision": payload.decision, "reason": payload.reason, "decided_by": payload.decided_by}
     )
     await db.commit()
     await db.refresh(case)

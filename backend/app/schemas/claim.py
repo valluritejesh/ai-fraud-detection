@@ -44,8 +44,20 @@ class ClaimResponse(BaseModel):
     estimated_vehicle_value: float
     claimed_amount: float
     status: str
-    risk_score: float
-    risk_level: str
+    
+    # Explicit separation of AI score vs override
+    ai_risk_score: float = 0.0
+    ai_risk_level: str = "UNASSESSED"
+    override_risk_score: Optional[float] = None
+    override_risk_level: Optional[str] = None
+    final_risk_score: float = 0.0
+    final_risk_level: str = "UNASSESSED"
+
+    risk_score: float = 0.0
+    risk_level: str = "UNASSESSED"
+    top_signal: Optional[str] = "PENDING_ANALYSIS"
+    assigned_investigator: Optional[str] = "Unassigned"
+
     created_at: datetime.datetime
     updated_at: datetime.datetime
 

@@ -16,8 +16,20 @@ export interface Claim {
   estimated_vehicle_value: number;
   claimed_amount: number;
   status: string;
+  
+  // Explicit separation of AI score vs override
+  ai_risk_score: number;
+  ai_risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNASSESSED";
+  override_risk_score?: number | null;
+  override_risk_level?: string | null;
+  final_risk_score: number;
+  final_risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNASSESSED";
+
   risk_score: number;
   risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNASSESSED";
+  top_signal?: string;
+  assigned_investigator?: string;
+
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +45,7 @@ export interface Evidence {
   extraction_status: string;
   extracted_data: Record<string, any>;
   confidence: number;
+  provider_mode: string;
   created_at: string;
 }
 
@@ -73,9 +86,14 @@ export interface InvestigationCase {
   assigned_to?: string;
   priority: string;
   investigator_notes: InvestigationNote[];
+  
+  original_ai_score: number;
+  original_ai_level: string;
   ai_risk_overridden: boolean;
-  override_score?: number;
-  override_reason?: string;
+  override_score?: number | null;
+  override_reason?: string | null;
+  final_effective_score: number;
+
   final_decision?: string;
   decision_reason?: string;
   decided_by?: string;

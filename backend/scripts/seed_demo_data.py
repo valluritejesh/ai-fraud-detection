@@ -4,7 +4,8 @@ import hashlib
 import asyncio
 from pathlib import Path
 from app.db.session import AsyncSessionLocal, init_db
-from app.db.models import HistoricalClaim, Claim, Evidence
+from app.db.models import HistoricalClaim, Claim, Evidence, FraudSignal, RiskAssessment, InvestigationCase, AuditLog
+from sqlalchemy import delete
 from app.agents.orchestrator import orchestrator
 from app.core.config import settings
 
@@ -145,6 +146,17 @@ async def seed_database():
         await db.commit()
         print(f"Seeded {len(SAMPLE_HISTORICAL_CLAIMS)} historical benchmark records.")
 
+        # Clean up any existing scenario claims to allow clean re-seeding
+        scenario_ids = [f"CLM-SCENARIO-{x}" for x in ["A", "B", "C", "D", "E", "F"]]
+        for sid in scenario_ids:
+            await db.execute(delete(FraudSignal).where(FraudSignal.claim_id == sid))
+            await db.execute(delete(RiskAssessment).where(RiskAssessment.claim_id == sid))
+            await db.execute(delete(InvestigationCase).where(InvestigationCase.claim_id == sid))
+            await db.execute(delete(Evidence).where(Evidence.claim_id == sid))
+            await db.execute(delete(AuditLog).where(AuditLog.resource_id == sid))
+            await db.execute(delete(Claim).where(Claim.id == sid))
+        await db.commit()
+
         # Seed the 6 Target Scenarios
         print("\nCreating 6 End-to-End Test Scenarios...")
 
@@ -173,7 +185,6 @@ async def seed_database():
         db.add(claim_a)
         await db.commit()
 
-        # Evidence: Claim Form, Repair Estimate, Invoice, Photo
         f_cf = create_evidence_file("CLM-SCENARIO-A", "claim_form.json", json.dumps({
             "policy_id": "POL-90100",
             "claimant_name": "Sarah Jenkins",
@@ -221,7 +232,8 @@ async def seed_database():
                 mime_type="application/json" if fpath.suffix == ".json" else "image/jpeg",
                 document_type=dtype,
                 file_size_bytes=len(content_b),
-                sha256_hash=hashlib.sha256(content_b).hexdigest()
+                sha256_hash=hashlib.sha256(content_b).hexdigest(),
+                provider_mode="LOCAL DEMO / MOCK"
             )
             db.add(ev)
         await db.commit()
@@ -276,7 +288,8 @@ async def seed_database():
                 mime_type="application/json",
                 document_type=dtype,
                 file_size_bytes=len(cb),
-                sha256_hash=hashlib.sha256(cb).hexdigest()
+                sha256_hash=hashlib.sha256(cb).hexdigest(),
+                provider_mode="LOCAL DEMO / MOCK"
             ))
         await db.commit()
 
@@ -288,7 +301,7 @@ async def seed_database():
             policy_id="POL-90300",
             claimant_id="CUST-1049",
             claimant_name="Jennifer Gomez",
-            incident_date="2026-08-12",  # Claim says Aug 12
+            incident_date="2026-08-12",
             incident_location="Congress Ave & 6th St",
             incident_description="Sideswiped at red light.",
             vehicle_make="Toyota",
@@ -311,7 +324,7 @@ async def seed_database():
         f_police_c = create_evidence_file("CLM-SCENARIO-C", "police_report.json", json.dumps({
             "report_number": "PR-TX-99410",
             "police_department": "Austin Police Dept",
-            "incident_date": "2026-08-28",  # Police report recorded Aug 28 (16 days later!)
+            "incident_date": "2026-08-28",
             "incident_location": "Congress Ave & 6th St",
             "damage_description": "Moderate quarter panel scrape."
         }))
@@ -325,7 +338,8 @@ async def seed_database():
                 mime_type="application/json",
                 document_type=dtype,
                 file_size_bytes=len(cb),
-                sha256_hash=hashlib.sha256(cb).hexdigest()
+                sha256_hash=hashlib.sha256(cb).hexdigest(),
+                provider_mode="LOCAL DEMO / MOCK"
             ))
         await db.commit()
 
@@ -351,9 +365,7 @@ async def seed_database():
         db.add(claim_d)
         await db.commit()
 
-        # Photo shows minor passenger rear door dent
         f_photo_d = create_evidence_file("CLM-SCENARIO-D", "photo_mismatch_rear_dent.jpg", "JPEG_DATA_PLACEHOLDER_PASSENGER_REAR_DOOR_SCRATCH")
-        # Estimate charges for entire front clip, hood, engine rebuild
         f_est_d = create_evidence_file("CLM-SCENARIO-D", "repair_estimate.json", json.dumps({
             "repair_shop": "Metro Collision Specialists",
             "estimate_date": "2026-08-15",
@@ -376,7 +388,8 @@ async def seed_database():
                 mime_type="image/jpeg" if "photo" in dtype else "application/json",
                 document_type=dtype,
                 file_size_bytes=len(cb),
-                sha256_hash=hashlib.sha256(cb).hexdigest()
+                sha256_hash=hashlib.sha256(cb).hexdigest(),
+                provider_mode="LOCAL DEMO / MOCK"
             ))
         await db.commit()
 
@@ -402,7 +415,6 @@ async def seed_database():
         db.add(claim_e)
         await db.commit()
 
-        # Recycles exact invoice number INV-RECYCLED-9901 from HIST-003!
         f_inv_e = create_evidence_file("CLM-SCENARIO-E", "invoice.json", json.dumps({
             "invoice_number": "INV-RECYCLED-9901",
             "invoice_date": "2026-08-18",
@@ -419,7 +431,8 @@ async def seed_database():
             mime_type="application/json",
             document_type="invoice",
             file_size_bytes=len(cb),
-            sha256_hash=hashlib.sha256(cb).hexdigest()
+            sha256_hash=hashlib.sha256(cb).hexdigest(),
+            provider_mode="LOCAL DEMO / MOCK"
         ))
         await db.commit()
 
@@ -461,7 +474,8 @@ async def seed_database():
             mime_type="application/json",
             document_type="invoice",
             file_size_bytes=len(cb),
-            sha256_hash=hashlib.sha256(cb).hexdigest()
+            sha256_hash=hashlib.sha256(cb).hexdigest(),
+            provider_mode="LOCAL DEMO / MOCK"
         ))
         await db.commit()
 
@@ -479,7 +493,7 @@ async def seed_database():
         ]:
             print(f"-> Analyzing {scenario_id}...")
             analyzed_claim = await orchestrator.run_fraud_analysis_pipeline(db, scenario_id)
-            print(f"   Done: Status={analyzed_claim.status} | Risk Score={analyzed_claim.risk_score} | Level={analyzed_claim.risk_level}")
+            print(f"   Done: Status={analyzed_claim.status} | AI Score={analyzed_claim.ai_risk_score} | Level={analyzed_claim.ai_risk_level} | Top Signal={analyzed_claim.top_signal}")
 
         print("\nSeed and Pipeline Execution Completed Successfully!")
 

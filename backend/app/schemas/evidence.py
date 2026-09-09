@@ -12,6 +12,7 @@ class RepairEstimateItem(BaseModel):
 
 class RepairEstimateExtraction(BaseModel):
     document_type: str = "repair_estimate"
+    provider_mode: str = "LOCAL HEURISTIC PARSER"
     claim_id: Optional[str] = None
     repair_shop: str
     repair_shop_address: Optional[str] = None
@@ -34,6 +35,7 @@ class InvoiceItem(BaseModel):
 
 class InvoiceExtraction(BaseModel):
     document_type: str = "invoice"
+    provider_mode: str = "LOCAL HEURISTIC PARSER"
     invoice_number: str
     invoice_date: str
     vendor_name: str
@@ -46,6 +48,7 @@ class InvoiceExtraction(BaseModel):
 
 class PoliceReportExtraction(BaseModel):
     document_type: str = "police_report"
+    provider_mode: str = "LOCAL HEURISTIC PARSER"
     report_number: str
     police_department: str
     officer_badge: Optional[str] = None
@@ -61,6 +64,7 @@ class PoliceReportExtraction(BaseModel):
 
 class ClaimFormExtraction(BaseModel):
     document_type: str = "claim_form"
+    provider_mode: str = "LOCAL HEURISTIC PARSER"
     claim_id: Optional[str] = None
     policy_id: str
     claimant_name: str
@@ -83,6 +87,7 @@ class DamageFinding(BaseModel):
 
 class DamagePhotoExtraction(BaseModel):
     document_type: str = "damage_photo"
+    provider_mode: str = "LOCAL DEMO / MOCK"
     image_id: Optional[str] = None
     vehicle_detected: bool = True
     vehicle_make: Optional[str] = None
@@ -107,4 +112,5 @@ class EvidenceResponse(BaseModel):
     extraction_status: str
     extracted_data: Dict[str, Any] = {}
     confidence: float
+    provider_mode: str = "LOCAL DEMO / MOCK"
     created_at: datetime.datetime

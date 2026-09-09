@@ -51,9 +51,15 @@ class InvestigationCaseResponse(BaseModel):
     assigned_to: Optional[str] = None
     priority: str
     investigator_notes: List[Dict[str, Any]] = []
+    
+    # Explicit separation of AI score vs override
+    original_ai_score: float = 0.0
+    original_ai_level: str = "UNASSESSED"
     ai_risk_overridden: bool = False
     override_score: Optional[float] = None
     override_reason: Optional[str] = None
+    final_effective_score: float = 0.0
+
     final_decision: Optional[str] = None
     decision_reason: Optional[str] = None
     decided_by: Optional[str] = None

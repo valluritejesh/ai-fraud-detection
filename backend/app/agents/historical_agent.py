@@ -13,7 +13,6 @@ KNOWN_SUSPICIOUS_SHOPS = [
 ]
 
 VEHICLE_REPAIR_BENCHMARKS = {
-    # Typical avg minor-to-moderate collision repair benchmarks by make
     "honda": 3200.0,
     "toyota": 3100.0,
     "ford": 3600.0,
@@ -56,7 +55,7 @@ class HistoricalPatternAgent:
         total_prior_claims = past_claim_count + other_current_count
         if total_prior_claims >= 2:
             anomalies.append({
-                "type": "CLAIM_FREQUENCY_SPIKE",
+                "signal_type": "CLAIM_FREQUENCY_SPIKE",
                 "category": "HISTORICAL_ANOMALY",
                 "severity": "CRITICAL" if total_prior_claims >= 3 else "HIGH",
                 "score_impact": 40.0 if total_prior_claims >= 3 else 25.0,
@@ -84,7 +83,7 @@ class HistoricalPatternAgent:
 
             if prior_dup:
                 anomalies.append({
-                    "type": "DUPLICATE_INVOICE_RECYCLED",
+                    "signal_type": "DUPLICATE_INVOICE_RECYCLED",
                     "category": "HISTORICAL_ANOMALY",
                     "severity": "CRITICAL",
                     "score_impact": 45.0,
@@ -110,7 +109,7 @@ class HistoricalPatternAgent:
         if shop_name:
             if any(susp.lower() in shop_name.lower() for susp in KNOWN_SUSPICIOUS_SHOPS):
                 anomalies.append({
-                    "type": "HIGH_RISK_REPAIR_SHOP",
+                    "signal_type": "HIGH_RISK_REPAIR_SHOP",
                     "category": "HISTORICAL_ANOMALY",
                     "severity": "HIGH",
                     "score_impact": 25.0,
@@ -127,7 +126,7 @@ class HistoricalPatternAgent:
 
             if fraudulent_shop_claims >= 2:
                 anomalies.append({
-                    "type": "REPEAT_FRAUDULENT_VENDOR",
+                    "signal_type": "REPEAT_FRAUDULENT_VENDOR",
                     "category": "HISTORICAL_ANOMALY",
                     "severity": "HIGH",
                     "score_impact": 20.0,
@@ -142,7 +141,7 @@ class HistoricalPatternAgent:
 
         if claim_amount > benchmark * 2.5 and current_claim.status != "TOTAL_LOSS":
             anomalies.append({
-                "type": "ABNORMAL_REPAIR_COST_MAGNITUDE",
+                "signal_type": "ABNORMAL_REPAIR_COST_MAGNITUDE",
                 "category": "HISTORICAL_ANOMALY",
                 "severity": "MEDIUM",
                 "score_impact": 20.0,

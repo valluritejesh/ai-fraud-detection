@@ -10,3 +10,9 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+*.png
+chrome_temp/
+edge_temp/
+*.tsbuildinfo
+

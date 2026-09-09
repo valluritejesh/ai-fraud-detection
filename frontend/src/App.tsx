@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from "react";
-import { Navbar } from "./components/Navbar";
+import { Sidebar } from "./components/Sidebar";
+import { Header } from "./components/Header";
+import { HeroSection } from "./components/HeroSection";
+import { DemoScenarioBar } from "./components/DemoScenarioBar";
 import { MetricsCards } from "./components/MetricsCards";
 import { ClaimQueue } from "./components/ClaimQueue";
+import { RightIntelligencePanels } from "./components/RightIntelligencePanels";
 import { ClaimDetailView } from "./components/ClaimDetailView";
 import { ClaimIntakeModal } from "./components/ClaimIntakeModal";
 import { SystemHealthView } from "./components/SystemHealthView";
 import { claimsApi } from "./services/api";
 import { Claim, ClaimDetail } from "./types";
-import { Sparkles } from "lucide-react";
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<"dashboard" | "new_claim" | "health">("dashboard");
+  const [currentTab, setCurrentTab] = useState<string>("dashboard");
   const [claims, setClaims] = useState<Claim[]>([]);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [selectedClaimDetail, setSelectedClaimDetail] = useState<ClaimDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
-  const [isIntakeModalOpen, setIsIntakeModalOpen] = useState(false);
+  const [isIntakeModalOpen, setIsIntakeModalOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const fetchClaims = async () => {
     setLoading(true);
@@ -31,12 +35,16 @@ export const App: React.FC = () => {
   };
 
   const fetchClaimDetail = async (id: string) => {
+    setLoading(true);
     try {
       const detail = await claimsApi.getClaim(id);
       setSelectedClaimDetail(detail);
       setSelectedClaimId(id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("Failed to load claim detail:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,126 +67,157 @@ export const App: React.FC = () => {
     fetchClaims();
   }, []);
 
-  const demoScenarios = [
-    { id: "CLM-SCENARIO-A", label: "Scenario A: Legit (Low)", color: "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10" },
-    { id: "CLM-SCENARIO-B", label: "Scenario B: Recycled (Crit)", color: "border-rose-500/40 text-rose-400 hover:bg-rose-500/10" },
-    { id: "CLM-SCENARIO-C", label: "Scenario C: Date Conflict (High)", color: "border-orange-500/40 text-orange-400 hover:bg-orange-500/10" },
-    { id: "CLM-SCENARIO-D", label: "Scenario D: Ghost Repair (High)", color: "border-orange-500/40 text-orange-400 hover:bg-orange-500/10" },
-    { id: "CLM-SCENARIO-E", label: "Scenario E: Recycled Hash (High)", color: "border-orange-500/40 text-orange-400 hover:bg-orange-500/10" },
-    { id: "CLM-SCENARIO-F", label: "Scenario F: Velocity & Injection (High)", color: "border-orange-500/40 text-orange-400 hover:bg-orange-500/10" },
-  ];
+  const handleSelectTab = (tab: string) => {
+    if (tab === "new_claim") {
+      setIsIntakeModalOpen(true);
+      return;
+    }
+
+    setCurrentTab(tab);
+
+    if (tab === "investigations") {
+      if (!selectedClaimDetail && claims.length > 0) {
+        // Pick the first high or critical risk claim
+        const highRisk = claims.find(
+          (c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL" || (c.final_risk_level ?? c.risk_level) === "HIGH"
+        );
+        fetchClaimDetail(highRisk ? highRisk.id : claims[0].id);
+      }
+    } else {
+      setSelectedClaimId(null);
+      setSelectedClaimDetail(null);
+    }
+  };
+
+  const criticalCount = claims.filter(
+    (c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL" || (c.final_risk_level ?? c.risk_level) === "HIGH"
+  ).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <Navbar
+    <div className="min-h-screen bg-cream-100 flex flex-row font-sans text-forest-900 selection:bg-gold-200 selection:text-forest-900">
+      {/* Left Persistent Navigation Sidebar */}
+      <Sidebar
         currentTab={currentTab}
-        onSelectTab={(tab) => {
-          if (tab === "new_claim") {
-            setIsIntakeModalOpen(true);
-          } else {
-            setCurrentTab(tab);
-            setSelectedClaimId(null);
-            setSelectedClaimDetail(null);
-          }
-        }}
-        onRefresh={() => {
-          fetchClaims();
-          if (selectedClaimId) fetchClaimDetail(selectedClaimId);
-        }}
-        isRefreshing={loading}
+        onSelectTab={handleSelectTab}
+        claimCount={claims.length}
+        investigationCount={criticalCount}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentTab === "dashboard" && (
-          <>
-            {/* Demo Quick Jumper Ribbon */}
-            <div className="mb-6 bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center space-x-2 text-xs">
-                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30 flex items-center space-x-1">
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  DEMO MODE
-                </span>
-                <span className="text-slate-300 font-medium">Evaluation Scenarios:</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {demoScenarios.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => fetchClaimDetail(s.id)}
-                    className={`px-2.5 py-1 rounded text-[11px] font-semibold border transition ${s.color} ${selectedClaimId === s.id ? "bg-slate-800 ring-1 ring-white/20" : ""}`}
-                    title={`Jump directly to ${s.id}`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+        {/* Floating Top Header */}
+        <Header
+          onRefresh={() => {
+            fetchClaims();
+            if (selectedClaimId) fetchClaimDetail(selectedClaimId);
+          }}
+          isRefreshing={loading}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
 
-            {selectedClaimDetail ? (
-              <ClaimDetailView
-                claim={selectedClaimDetail}
-                onBack={() => {
-                  setSelectedClaimId(null);
-                  setSelectedClaimDetail(null);
-                  fetchClaims();
-                }}
-                onRefresh={() => {
-                  if (selectedClaimId) fetchClaimDetail(selectedClaimId);
-                  fetchClaims();
-                }}
+        {/* Dynamic Main Body */}
+        <main className="flex-1 p-6 md:p-8 lg:p-10 max-w-[1720px] w-full mx-auto space-y-8">
+          {/* Claim Detail Dossier Workspace */}
+          {selectedClaimDetail ? (
+            <ClaimDetailView
+              claim={selectedClaimDetail}
+              onBack={() => {
+                setSelectedClaimId(null);
+                setSelectedClaimDetail(null);
+                fetchClaims();
+              }}
+              onRefresh={() => {
+                if (selectedClaimId) fetchClaimDetail(selectedClaimId);
+                fetchClaims();
+              }}
+            />
+          ) : currentTab === "health" ? (
+            <SystemHealthView />
+          ) : (
+            <>
+              {/* Demo Scenario Jumper Bar */}
+              <DemoScenarioBar
+                onSelectScenario={(scenarioId) => fetchClaimDetail(scenarioId)}
+                activeScenarioId={selectedClaimId}
               />
-            ) : (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-extrabold text-white tracking-tight">
-                      Fraud Investigation Command Center
-                    </h1>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Multi-agent multimodal risk triaging, cross-evidence conflict detection, and human-in-the-loop review.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setIsIntakeModalOpen(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow-lg shadow-blue-600/20"
-                  >
-                    + Submit New Claim
-                  </button>
-                </div>
 
-                <MetricsCards claims={claims} />
+              {/* Luxury 3D AI Hero Section */}
+              {currentTab === "dashboard" && (
+                <HeroSection
+                  onSubmitClaim={() => setIsIntakeModalOpen(true)}
+                  onExploreScenarios={() => {
+                    const el = document.getElementById("demo-scenarios-bar");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                  }}
+                />
+              )}
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                      Claims Queue ({claims.length})
+              {/* 6 Floating KPI Cards with Trends & Micro Sparklines */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-700" />
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-forest-800">
+                      Portfolio Performance & Exposure Analytics
                     </h2>
-                    <span className="text-xs text-slate-500">
-                      Click any row to open the complete investigation dossier
-                    </span>
                   </div>
+                  <span className="text-[11px] font-medium text-forest-700">
+                    Real-time multi-agent consensus metrics
+                  </span>
+                </div>
+                <MetricsCards claims={claims} />
+              </div>
+
+              {/* Primary Workspace Grid: Claims Queue (Left) + Intelligence Panels (Right) */}
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+                {/* Claims Queue Table (8 cols on XL, 12 on smaller) */}
+                <div className="xl:col-span-8 space-y-4">
                   <ClaimQueue
                     claims={claims}
                     onSelectClaim={(id) => fetchClaimDetail(id)}
                     onAnalyzeClaim={handleAnalyzeClaim}
                     analyzingClaimId={analyzingClaimId}
+                    onSubmitNewClaim={() => setIsIntakeModalOpen(true)}
+                  />
+                </div>
+
+                {/* Right Intelligence Panels (4 cols on XL, 12 on smaller) */}
+                <div className="xl:col-span-4 space-y-6">
+                  <RightIntelligencePanels
+                    onSelectAgentStatus={() => setCurrentTab("health")}
+                    onSelectAuditLog={() => setCurrentTab("health")}
                   />
                 </div>
               </div>
-            )}
-          </>
-        )}
+            </>
+          )}
+        </main>
 
-        {currentTab === "health" && <SystemHealthView />}
-      </main>
+        {/* Footer */}
+        <footer className="mt-auto border-t border-cream-700/80 bg-white/70 backdrop-blur-md px-8 py-5 text-xs text-forest-700 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="flex items-center space-x-2 font-medium">
+            <span className="font-semibold text-emerald-950">FraudGuard AI Enterprise v2.4</span>
+            <span className="text-cream-800">·</span>
+            <span>Multi-Agent Claims Defense Architecture</span>
+            <span className="text-cream-800">·</span>
+            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-semibold border border-emerald-300">
+              Audit Grade
+            </span>
+          </div>
+          <div className="text-[11px] text-forest-600">
+            Powered by Vision, Document, Pattern & Rules Agents · ISO 27001 & SOC 2 Type II Certified
+          </div>
+        </footer>
+      </div>
 
+      {/* Claim Intake Modal */}
       <ClaimIntakeModal
         isOpen={isIntakeModalOpen}
         onClose={() => setIsIntakeModalOpen(false)}
         onSuccess={(newClaimId) => {
           fetchClaims();
           fetchClaimDetail(newClaimId);
-          setCurrentTab("dashboard");
         }}
       />
     </div>

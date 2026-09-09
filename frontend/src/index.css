@@ -2,23 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  background-color: #0b1120;
-  color: #f8fafc;
+@layer base {
+  body {
+    margin: 0;
+    background-color: #F7F5EE;
+    color: #063B32;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
+/* Glassmorphism & Neo-Glass Classes */
+.glass-card {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(11, 93, 79, 0.10);
+  box-shadow: 0 4px 20px -2px rgba(6, 59, 50, 0.05), 0 2px 6px -1px rgba(6, 59, 50, 0.03);
+}
+
+.glass-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -4px rgba(6, 59, 50, 0.10), 0 4px 10px -2px rgba(6, 59, 50, 0.05);
+  border-color: rgba(217, 164, 65, 0.30);
+}
+
+.glass-card-dark {
+  background: rgba(6, 59, 50, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.20);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.30);
+}
+
+.glass-card-gold {
+  background: linear-gradient(135deg, rgba(247, 231, 178, 0.35) 0%, rgba(255, 255, 255, 0.85) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 164, 65, 0.30);
+}
+
+/* 3D Visual Effects */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.floating-3d-scene {
+  transform: rotateY(-8deg) rotateX(4deg);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.floating-3d-scene:hover {
+  transform: rotateY(-4deg) rotateX(2deg);
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(0.5deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(6px) rotate(-0.5deg);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 7s ease-in-out infinite;
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #ECE8DD;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #0B5D4F;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #063B32;
 }

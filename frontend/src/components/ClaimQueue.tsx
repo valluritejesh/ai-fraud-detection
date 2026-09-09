@@ -10,7 +10,11 @@ import {
   SlidersHorizontal,
   Plus,
   Filter,
-  UserCheck
+  UserCheck,
+  CheckSquare,
+  Square,
+  MoreVertical,
+  Eye
 } from "lucide-react";
 import { Claim } from "../types";
 
@@ -20,6 +24,7 @@ interface ClaimQueueProps {
   onAnalyzeClaim: (claimId: string) => void;
   analyzingClaimId?: string | null;
   onSubmitNewClaim?: () => void;
+  searchQuery?: string;
 }
 
 type SortField = "incident_date" | "claimed_amount" | "risk_score";
@@ -31,12 +36,14 @@ export const ClaimQueue: React.FC<ClaimQueueProps> = ({
   onAnalyzeClaim,
   analyzingClaimId,
   onSubmitNewClaim,
+  searchQuery = "",
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [riskFilter, setRiskFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortField, setSortField] = useState<SortField>("risk_score");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -47,15 +54,33 @@ export const ClaimQueue: React.FC<ClaimQueueProps> = ({
     }
   };
 
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredClaims.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredClaims.map((c) => c.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const activeSearch = (searchQuery || searchTerm).toLowerCase();
+
   const filteredClaims = claims.filter((c) => {
-    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      c.id.toLowerCase().includes(term) ||
-      c.claimant_name.toLowerCase().includes(term) ||
-      c.policy_id.toLowerCase().includes(term) ||
-      c.vehicle_vin.toLowerCase().includes(term) ||
-      (c.top_signal && c.top_signal.toLowerCase().includes(term)) ||
-      (c.assigned_investigator && c.assigned_investigator.toLowerCase().includes(term));
+      !activeSearch ||
+      c.id.toLowerCase().includes(activeSearch) ||
+      c.claimant_name.toLowerCase().includes(activeSearch) ||
+      c.policy_id.toLowerCase().includes(activeSearch) ||
+      c.vehicle_vin.toLowerCase().includes(activeSearch) ||
+      (c.top_signal && c.top_signal.toLowerCase().includes(activeSearch)) ||
+      (c.assigned_investigator && c.assigned_investigator.toLowerCase().includes(activeSearch));
 
     const effectiveLevel = c.final_risk_level ?? c.risk_level;
     const matchesRisk = riskFilter === "ALL" || effectiveLevel === riskFilter;
@@ -80,276 +105,264 @@ export const ClaimQueue: React.FC<ClaimQueueProps> = ({
     return sortOrder === "asc" ? comparison : -comparison;
   });
 
-  const getRiskScoreBadge = (score: number, level: string, hasOverride: boolean) => {
-    let colorClass = "bg-emerald-50 text-emerald-800 border-emerald-300";
-    let dotColor = "bg-emerald-500";
+  const getRiskScoreVisual = (score: number, level: string, hasOverride: boolean) => {
+    let badgeClass = "bg-emerald-100 text-emerald-900 border-emerald-300";
+    let barColor = "bg-emerald-500";
 
     if (level === "CRITICAL" || score >= 80) {
-      colorClass = "bg-rose-50 text-rose-800 border-rose-300 shadow-sm shadow-rose-500/10";
-      dotColor = "bg-rose-500";
+      badgeClass = "bg-rose-100 text-rose-950 border-rose-300 shadow-sm";
+      barColor = "bg-rose-600";
     } else if (level === "HIGH" || score >= 60) {
-      colorClass = "bg-orange-50 text-orange-800 border-orange-300";
-      dotColor = "bg-orange-500";
+      badgeClass = "bg-orange-100 text-orange-950 border-orange-300";
+      barColor = "bg-orange-500";
     } else if (level === "MEDIUM" || score > 30) {
-      colorClass = "bg-gold-50 text-gold-900 border-gold-300";
-      dotColor = "bg-gold-500";
+      badgeClass = "bg-amber-100 text-amber-950 border-amber-300";
+      barColor = "bg-amber-500";
     }
 
     return (
-      <div className="flex items-center space-x-2">
-        <span className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${colorClass}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
-          <span>{score.toFixed(0)}</span>
-          <span className="text-[10px] font-extrabold uppercase tracking-wide opacity-90">{level}</span>
-        </span>
-        {hasOverride && (
-          <span className="text-[9px] font-semibold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded border border-purple-200" title="Human Override Active">
-            Override
+      <div className="flex flex-col space-y-1">
+        <div className="flex items-center space-x-2">
+          <span className={`px-2 py-0.5 rounded text-[11px] font-black font-mono border ${badgeClass}`}>
+            {Math.round(score)} {level}
           </span>
-        )}
+          {hasOverride && (
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-gold-400/20 text-gold-900 border border-gold-400 font-mono">
+              OVERRIDE
+            </span>
+          )}
+        </div>
+        {/* Visual risk bar meter */}
+        <div className="w-24 h-1.5 rounded-full bg-cream-500 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${Math.min(100, Math.max(5, score))}%` }}
+          />
+        </div>
       </div>
     );
   };
 
-  const getWorkflowBadge = (status: string) => {
-    if (status === "REVIEW_REQUIRED" || status === "HUMAN_REVIEW") {
-      return (
-        <span className="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-rose-50 text-rose-800 border border-rose-300">
-          REVIEW REQUIRED
-        </span>
-      );
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "APPROVED":
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Approved</span>;
+      case "REJECTED":
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">Rejected</span>;
+      case "ESCALATED":
+      case "REVIEW_REQUIRED":
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">SIU Escalated</span>;
+      case "ANALYZED":
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-300">Triaged</span>;
+      default:
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cream-300 text-forest-800 border border-cream-600">{status}</span>;
     }
-    if (status.startsWith("FINAL_DECISION_")) {
-      const dec = status.replace("FINAL_DECISION_", "");
-      const isApprove = dec === "APPROVED";
-      return (
-        <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border ${
-          isApprove ? "bg-emerald-50 text-emerald-800 border-emerald-300" : "bg-rose-50 text-rose-800 border-rose-300"
-        }`}>
-          {dec}
-        </span>
-      );
-    }
-    return (
-      <span className="px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-300">
-        NORMAL PROCESSING
-      </span>
-    );
   };
 
   return (
-    <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-cream-700/80 shadow-card-soft p-6">
-      {/* Top Header & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-cream-600/70">
+    <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-cream-700/80 shadow-card-soft overflow-hidden transition-all">
+      {/* Specular highlight */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cream-500 to-transparent pointer-events-none" />
+
+      {/* Header Bar */}
+      <div className="p-5 border-b border-cream-600/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h2 className="text-lg font-extrabold text-emerald-950 font-sans tracking-tight">
-              Claims Queue
+            <h2 className="text-base font-black text-forest-950 font-sans tracking-tight">
+              Claims Queue ({claims.length})
             </h2>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-forest-800/10 text-forest-800 font-bold border border-forest-800/20">
-              {claims.length}
+            <span className="px-2 py-0.5 rounded-full bg-cream-300 text-forest-800 font-mono text-[10px] font-bold">
+              PORTFOLIO TRIAGE
             </span>
           </div>
-          <p className="text-xs text-forest-700/80 mt-0.5">
-            Review, investigate, and cross-verify flagged insurance claims
+          <p className="text-xs text-forest-700 font-medium mt-0.5">
+            Review and investigate flagged claims across multimodal evidence
           </p>
         </div>
 
         {onSubmitNewClaim && (
           <button
             onClick={onSubmitNewClaim}
-            className="px-4 py-2 rounded-xl bg-forest-800 hover:bg-emerald-900 text-gold-300 hover:text-white font-bold text-xs tracking-wide shadow-sm border border-gold-400/40 transition flex items-center space-x-1.5 shrink-0"
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-800 to-forest-800 text-white font-bold text-xs shadow-md hover:bg-emerald-700 active:scale-95 transition-all flex items-center space-x-1.5 border border-emerald-600/40 shrink-0"
           >
-            <Plus className="w-4 h-4" />
-            <span>Submit New Claim</span>
+            <Plus className="w-3.5 h-3.5 text-gold-300" />
+            <span>+ Submit New Claim</span>
           </button>
         )}
       </div>
 
-      {/* Filter & Search Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-4">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-forest-800/60" />
-          <input
-            type="text"
-            placeholder="Search Claim ID, Claimant, Policy, VIN, Signal..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl text-xs bg-cream-300/40 border border-cream-600 text-emerald-950 placeholder-forest-800/50 focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 focus:bg-white transition shadow-inner"
-          />
+      {/* Filter & Search Ribbon */}
+      <div className="p-4 bg-cream-100/50 border-b border-cream-600/70 flex flex-wrap items-center justify-between gap-3">
+        {/* Risk Filter Pills */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-forest-700 mr-1 font-mono">
+            Risk:
+          </span>
+          {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"].map((r) => (
+            <button
+              key={r}
+              onClick={() => setRiskFilter(r)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                riskFilter === r
+                  ? "bg-forest-900 text-white shadow-sm"
+                  : "bg-white text-forest-800 hover:bg-cream-300/80 border border-cream-600/80"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Risk Level Filter */}
-          <div className="flex items-center space-x-1 bg-cream-400/50 p-1 rounded-xl border border-cream-600/70 text-xs">
-            <span className="px-2 text-[11px] font-bold text-forest-800">Risk:</span>
-            {["ALL", "LOW", "MEDIUM", "HIGH", "CRITICAL"].map((lvl) => (
-              <button
-                key={lvl}
-                onClick={() => setRiskFilter(lvl)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                  riskFilter === lvl
-                    ? "bg-forest-800 text-gold-200 shadow-sm"
-                    : "text-forest-700 hover:text-emerald-950"
-                }`}
-              >
-                {lvl}
-              </button>
-            ))}
-          </div>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-xl text-xs bg-cream-400/50 border border-cream-600/70 text-forest-900 font-semibold focus:outline-none focus:border-emerald-700"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="REVIEW_REQUIRED">Review Required</option>
-            <option value="NORMAL_PROCESSING">Normal Processing</option>
-          </select>
+        {/* Local Search input */}
+        <div className="relative flex items-center w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 absolute left-3 text-forest-700/60 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Filter within queue..."
+            className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-white border border-cream-600/80 text-forest-950 placeholder-forest-700/50 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+          />
         </div>
       </div>
 
-      {/* Enterprise Data Table */}
-      <div className="overflow-x-auto rounded-xl border border-cream-600/80">
-        <table className="w-full text-left text-xs border-collapse">
+      {/* Table Container */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-cream-400/80 text-forest-900 font-extrabold border-b border-cream-600/80 uppercase tracking-wider text-[10px]">
-              <th className="py-3 px-4">Claim ID</th>
+            <tr className="bg-cream-200/50 border-b border-cream-600/70 text-[10px] uppercase font-bold text-forest-800 font-mono tracking-wider">
+              <th className="p-3.5 w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size > 0 && selectedIds.size === filteredClaims.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-cream-600 text-emerald-700 focus:ring-0 cursor-pointer"
+                />
+              </th>
+              <th className="p-3.5">Claim ID</th>
+              <th className="p-3.5">Claimant / Policy</th>
               <th
+                className="p-3.5 cursor-pointer hover:text-emerald-950 select-none"
                 onClick={() => toggleSort("incident_date")}
-                className="py-3 px-4 cursor-pointer hover:text-emerald-950 transition"
               >
                 <div className="flex items-center space-x-1">
                   <span>Incident Date</span>
-                  {sortField === "incident_date" ? (
-                    sortOrder === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                  ) : (
-                    <ArrowUpDown className="w-3 h-3 text-forest-800/40" />
-                  )}
+                  <ArrowUpDown className="w-3 h-3 opacity-60" />
                 </div>
               </th>
-              <th className="py-3 px-4">Claimant & Policy</th>
               <th
+                className="p-3.5 cursor-pointer hover:text-emerald-950 select-none"
                 onClick={() => toggleSort("claimed_amount")}
-                className="py-3 px-4 cursor-pointer hover:text-emerald-950 transition"
               >
                 <div className="flex items-center space-x-1">
-                  <span>Claim Amount</span>
-                  {sortField === "claimed_amount" ? (
-                    sortOrder === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                  ) : (
-                    <ArrowUpDown className="w-3 h-3 text-forest-800/40" />
-                  )}
+                  <span>Claimed Amount</span>
+                  <ArrowUpDown className="w-3 h-3 opacity-60" />
                 </div>
               </th>
               <th
+                className="p-3.5 cursor-pointer hover:text-emerald-950 select-none"
                 onClick={() => toggleSort("risk_score")}
-                className="py-3 px-4 cursor-pointer hover:text-emerald-950 transition"
               >
                 <div className="flex items-center space-x-1">
-                  <span>Risk Score</span>
-                  {sortField === "risk_score" ? (
-                    sortOrder === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
-                  ) : (
-                    <ArrowUpDown className="w-3 h-3 text-forest-800/40" />
-                  )}
+                  <span>Risk Rating</span>
+                  <ArrowUpDown className="w-3 h-3 opacity-60" />
                 </div>
               </th>
-              <th className="py-3 px-4">Top Adverse Signal</th>
-              <th className="py-3 px-4">Workflow Status</th>
-              <th className="py-3 px-4">Assigned Investigator</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+              <th className="p-3.5">Top Anomaly Signal</th>
+              <th className="p-3.5">Status</th>
+              <th className="p-3.5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-cream-600/50">
+          <tbody className="divide-y divide-cream-600/60">
             {sortedClaims.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-10 text-forest-700 italic">
-                  No claims match the selected filter criteria.
+                <td colSpan={9} className="p-8 text-center text-forest-700">
+                  No claims match the active filters.
                 </td>
               </tr>
             ) : (
-              sortedClaims.map((c) => {
-                const effectiveScore = c.final_risk_score ?? c.risk_score ?? 0;
-                const effectiveLevel = c.final_risk_level ?? c.risk_level ?? "LOW";
-                const isOverridden = c.override_risk_score !== null && c.override_risk_score !== undefined;
-                const isAnalyzing = analyzingClaimId === c.id;
+              sortedClaims.map((claim) => {
+                const effectiveScore = claim.final_risk_score ?? claim.risk_score;
+                const effectiveLevel = claim.final_risk_level ?? claim.risk_level;
+                const hasOverride = claim.override_risk_score !== null && claim.override_risk_score !== undefined;
+                const isSelected = selectedIds.has(claim.id);
+                const isAnalyzing = analyzingClaimId === claim.id;
 
                 return (
                   <tr
-                    key={c.id}
-                    onClick={() => onSelectClaim(c.id)}
-                    className="hover:bg-cream-300/60 transition cursor-pointer group"
+                    key={claim.id}
+                    onClick={() => onSelectClaim(claim.id)}
+                    className={`cursor-pointer transition-all duration-150 group ${
+                      isSelected ? "bg-cream-300/80" : "hover:bg-cream-200/50"
+                    }`}
                   >
-                    {/* Claim ID */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-emerald-950 group-hover:text-emerald-700 transition">
-                      {c.id}
+                    {/* Checkbox */}
+                    <td className="p-3.5 text-center" onClick={(e) => toggleSelectOne(claim.id, e)}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="rounded border-cream-600 text-emerald-700 focus:ring-0 cursor-pointer"
+                      />
                     </td>
 
-                    {/* Incident Date */}
-                    <td className="py-3.5 px-4 text-forest-800 font-mono text-[11px]">
-                      {c.incident_date}
+                    {/* Claim ID */}
+                    <td className="p-3.5 font-mono font-bold text-emerald-900 group-hover:text-emerald-700">
+                      {claim.id}
                     </td>
 
                     {/* Claimant & Policy */}
-                    <td className="py-3.5 px-4">
-                      <p className="font-bold text-emerald-950">{c.claimant_name}</p>
-                      <p className="text-[10px] font-mono text-forest-700">{c.policy_id}</p>
+                    <td className="p-3.5">
+                      <div className="font-bold text-forest-950">{claim.claimant_name}</div>
+                      <div className="text-[10px] text-forest-700 font-mono">{claim.policy_id}</div>
                     </td>
 
-                    {/* Claim Amount */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-emerald-950">
-                      ${c.claimed_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {/* Incident Date */}
+                    <td className="p-3.5 font-mono text-forest-800 text-[11px]">
+                      {claim.incident_date}
                     </td>
 
-                    {/* Risk Score */}
-                    <td className="py-3.5 px-4">
-                      {getRiskScoreBadge(effectiveScore, effectiveLevel, isOverridden)}
+                    {/* Claimed Amount */}
+                    <td className="p-3.5 font-mono font-black text-forest-950 text-xs">
+                      ${claim.claimed_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
 
-                    {/* Top Signal */}
-                    <td className="py-3.5 px-4 max-w-[200px]">
-                      <span
-                        className="text-[11px] font-mono text-forest-900 bg-cream-400/80 px-2 py-0.5 rounded border border-cream-700 inline-block truncate max-w-[190px]"
-                        title={c.top_signal || "PENDING_ANALYSIS"}
-                      >
-                        {c.top_signal || "PENDING_ANALYSIS"}
+                    {/* Risk Score & Visual Meter */}
+                    <td className="p-3.5">
+                      {getRiskScoreVisual(effectiveScore, effectiveLevel, hasOverride)}
+                    </td>
+
+                    {/* Top Anomaly Signal */}
+                    <td className="p-3.5">
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-cream-300/80 border border-cream-600 text-forest-900 truncate block max-w-[200px]">
+                        {claim.top_signal || "NO_ADVERSE_SIGNALS"}
                       </span>
                     </td>
 
-                    {/* Status */}
-                    <td className="py-3.5 px-4">
-                      {getWorkflowBadge(c.status)}
-                    </td>
-
-                    {/* Investigator */}
-                    <td className="py-3.5 px-4 text-forest-800 text-[11px] font-medium">
-                      {c.assigned_investigator || "SIU Triaging Pool"}
+                    {/* Status Badge */}
+                    <td className="p-3.5">
+                      {getStatusBadge(claim.status)}
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end space-x-2">
+                    <td className="p-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end space-x-1.5">
                         <button
-                          onClick={() => onAnalyzeClaim(c.id)}
+                          onClick={() => onAnalyzeClaim(claim.id)}
                           disabled={isAnalyzing}
-                          className="px-2.5 py-1 rounded-lg bg-forest-800/10 hover:bg-forest-800/20 text-forest-800 border border-forest-800/30 text-[11px] font-bold transition flex items-center space-x-1"
-                          title="Run Multi-Agent Analysis"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold transition flex items-center space-x-1"
+                          title="Run Multi-Agent Triage"
                         >
-                          <Play className={`w-3 h-3 ${isAnalyzing ? "animate-spin text-emerald-600" : ""}`} />
-                          <span>{isAnalyzing ? "Analyzing..." : "Run AI"}</span>
+                          <Play className={`w-2.5 h-2.5 ${isAnalyzing ? "animate-spin" : ""}`} />
+                          <span>{isAnalyzing ? "Triaging..." : "Triage"}</span>
                         </button>
 
                         <button
-                          onClick={() => onSelectClaim(c.id)}
-                          className="p-1.5 rounded-lg hover:bg-cream-400 text-forest-800 transition"
-                          title="Open Investigation Dossier"
+                          onClick={() => onSelectClaim(claim.id)}
+                          className="p-1.5 rounded-lg bg-cream-200 hover:bg-cream-300 text-forest-900 border border-cream-600 transition"
+                          title="View Full Dossier"
                         >
-                          <ChevronRight className="w-4 h-4 text-emerald-900" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>

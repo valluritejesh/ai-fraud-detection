@@ -1,12 +1,13 @@
 import React from "react";
 import {
   FileText,
-  CheckCircle2,
+  ShieldCheck,
   AlertTriangle,
+  Flame,
   ShieldAlert,
   Scale,
   TrendingUp,
-  ShieldQuestion
+  TrendingDown
 } from "lucide-react";
 import { Claim } from "../types";
 
@@ -15,141 +16,151 @@ interface MetricsCardsProps {
 }
 
 export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
-  const totalClaims = claims.length;
-  const lowRisk = claims.filter((c) => (c.final_risk_score ?? c.risk_score) <= 30).length;
-  const medRisk = claims.filter(
-    (c) => (c.final_risk_score ?? c.risk_score) > 30 && (c.final_risk_score ?? c.risk_score) <= 60
+  const total = claims.length;
+
+  const low = claims.filter(
+    (c) => (c.final_risk_level ?? c.risk_level) === "LOW"
   ).length;
-  const highRisk = claims.filter(
-    (c) => (c.final_risk_score ?? c.risk_score) > 60 && (c.final_risk_score ?? c.risk_score) <= 80
+
+  const medium = claims.filter(
+    (c) => (c.final_risk_level ?? c.risk_level) === "MEDIUM"
   ).length;
-  const critRisk = claims.filter((c) => (c.final_risk_score ?? c.risk_score) > 80).length;
+
+  const high = claims.filter(
+    (c) => (c.final_risk_level ?? c.risk_level) === "HIGH"
+  ).length;
+
+  const critical = claims.filter(
+    (c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL"
+  ).length;
+
   const siuQueue = claims.filter(
-    (c) => c.status === "REVIEW_REQUIRED" || c.status === "HUMAN_REVIEW" || (c.final_risk_score ?? c.risk_score) >= 60
+    (c) =>
+      (c.final_risk_level ?? c.risk_level) === "CRITICAL" ||
+      (c.final_risk_level ?? c.risk_level) === "HIGH" ||
+      c.status === "IN_REVIEW" ||
+      c.status === "ESCALATED"
   ).length;
 
   const cards = [
     {
       title: "TOTAL CLAIMS",
-      count: totalClaims,
-      trend: "↑ 12%",
-      subtitle: "Active claims in pipeline",
+      value: total,
+      subtext: "Active portfolio claims",
+      trend: "Continuous Triage",
+      trendColor: "bg-emerald-50 text-emerald-800 border-emerald-200",
       icon: FileText,
-      iconColor: "text-forest-800",
-      iconBg: "bg-forest-800/10 border-forest-800/20",
-      accentBar: "bg-forest-800",
-      sparkline: "M0,15 Q20,5 40,12 T80,8 T100,4",
+      iconBg: "bg-forest-900/10 text-forest-800 border-forest-700/20",
       sparkColor: "#0B5D4F",
+      sparkPath: "M0 25 Q15 28 30 18 T60 12 T90 20 T120 10",
     },
     {
       title: "LOW RISK",
-      count: lowRisk,
-      trend: "STP Eligible",
-      subtitle: "Score 0–30 • Fast-track pay",
-      icon: CheckCircle2,
-      iconColor: "text-emerald-600",
-      iconBg: "bg-emerald-500/10 border-emerald-500/20",
-      accentBar: "bg-emerald-500",
-      sparkline: "M0,12 Q25,8 50,14 T100,6",
+      value: low,
+      subtext: "Straight-through automation",
+      trend: `${total > 0 ? Math.round((low / total) * 100) : 0}% Clean`,
+      trendColor: "bg-emerald-100 text-emerald-800 border-emerald-300",
+      icon: ShieldCheck,
+      iconBg: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
       sparkColor: "#10B981",
+      sparkPath: "M0 15 Q20 8 40 18 T80 10 T100 12 T120 6",
     },
     {
       title: "MEDIUM RISK",
-      count: medRisk,
-      trend: "Monitored",
-      subtitle: "Score 31–60 • Standard review",
-      icon: ShieldQuestion,
-      iconColor: "text-gold-600",
-      iconBg: "bg-gold-500/10 border-gold-500/20",
-      accentBar: "bg-gold-500",
-      sparkline: "M0,10 Q30,16 60,6 T100,10",
-      sparkColor: "#D9A441",
+      value: medium,
+      subtext: "Watch list & validation",
+      trend: "Score 31–60",
+      trendColor: "bg-amber-100 text-amber-800 border-amber-300",
+      icon: AlertTriangle,
+      iconBg: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+      sparkColor: "#E5A11A",
+      sparkPath: "M0 20 Q30 20 60 14 T90 16 T120 18",
     },
     {
       title: "HIGH RISK",
-      count: highRisk,
-      trend: "Attention",
-      subtitle: "Score 61–80 • SIU review",
+      value: high,
+      subtext: "Deterministic rule conflicts",
+      trend: "Score 61–80",
+      trendColor: "bg-orange-100 text-orange-900 border-orange-300",
       icon: AlertTriangle,
-      iconColor: "text-risk-high",
-      iconBg: "bg-orange-500/10 border-orange-500/20",
-      accentBar: "bg-risk-high",
-      sparkline: "M0,14 Q30,10 60,18 T100,6",
+      iconBg: "bg-orange-500/15 text-orange-700 border-orange-500/30",
       sparkColor: "#F97316",
+      sparkPath: "M0 28 Q25 24 50 16 T85 10 T120 8",
     },
     {
       title: "CRITICAL RISK",
-      count: critRisk,
-      trend: "Immediate",
-      subtitle: "Score 81–100 • Priority freeze",
-      icon: ShieldAlert,
-      iconColor: "text-risk-critical",
-      iconBg: "bg-rose-500/10 border-rose-500/20",
-      accentBar: "bg-risk-critical",
-      sparkline: "M0,16 Q20,18 40,8 T80,4 T100,2",
+      value: critical,
+      subtext: "Severe anomaly & recycled",
+      trend: "Score 81–100",
+      trendColor: "bg-rose-100 text-rose-900 border-rose-300 font-bold",
+      icon: Flame,
+      iconBg: "bg-rose-500/15 text-rose-600 border-rose-500/30",
       sparkColor: "#EF4444",
+      sparkPath: "M0 30 Q20 28 50 18 T90 8 T120 4",
     },
     {
       title: "SIU QUEUE",
-      count: siuQueue,
-      trend: "Assigned",
-      subtitle: "Requires investigator determination",
+      value: siuQueue,
+      subtext: "Mandatory human review",
+      trend: "Priority Escalation",
+      trendColor: "bg-gold-100 text-gold-900 border-gold-300 font-bold",
       icon: Scale,
-      iconColor: "text-purple-600",
-      iconBg: "bg-purple-500/10 border-purple-500/20",
-      accentBar: "bg-purple-600",
-      sparkline: "M0,8 Q30,14 60,8 T100,4",
-      sparkColor: "#9333EA",
+      iconBg: "bg-gold-500/20 text-gold-700 border-gold-400/40",
+      sparkColor: "#D9A441",
+      sparkPath: "M0 24 Q30 20 60 12 T90 6 T120 8",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5 mb-7">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
           <div
             key={idx}
-            className="bg-white/90 backdrop-blur-md rounded-2xl border border-cream-700/80 p-4 shadow-card-soft hover:shadow-card-elevated transition-all duration-200 group flex flex-col justify-between relative overflow-hidden"
+            className="p-4 rounded-2xl bg-white/95 backdrop-blur-xl border border-cream-700/80 shadow-card-soft hover:shadow-card-elevated hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group"
           >
-            {/* Top Row: Icon & Trend */}
+            {/* Top Specular Line */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cream-500 to-transparent pointer-events-none" />
+
+            {/* Subtle background sparkline */}
+            <svg
+              className="absolute right-0 bottom-0 w-28 h-12 pointer-events-none opacity-30 group-hover:opacity-50 transition-opacity"
+              viewBox="0 0 120 35"
+              fill="none"
+            >
+              <path
+                d={card.sparkPath}
+                stroke={card.sparkColor}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+
+            {/* Top row: Title + Icon */}
             <div className="flex items-center justify-between mb-2">
-              <div className={`p-2 rounded-xl border ${card.iconBg} ${card.iconColor}`}>
-                <Icon className="w-4 h-4" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-forest-700 font-mono">
+                {card.title}
+              </span>
+              <div className={`p-1.5 rounded-lg border ${card.iconBg}`}>
+                <Icon className="w-3.5 h-3.5" />
               </div>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cream-500 text-forest-900 border border-cream-700 font-mono">
+            </div>
+
+            {/* Middle row: Big Metric Number */}
+            <div className="flex items-baseline space-x-2">
+              <span className="text-2xl lg:text-3xl font-black font-mono tracking-tight text-forest-950">
+                {card.value}
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold border ${card.trendColor}`}>
                 {card.trend}
               </span>
             </div>
 
-            {/* Middle: Numbers & Title */}
-            <div className="my-1">
-              <div className="text-2xl sm:text-3xl font-black text-emerald-950 tracking-tight font-sans">
-                {card.count}
-              </div>
-              <h3 className="text-[10px] font-extrabold uppercase tracking-wider text-forest-700 mt-0.5">
-                {card.title}
-              </h3>
-            </div>
-
-            {/* Bottom: Subtitle & Sparkline */}
-            <div className="pt-2 border-t border-cream-600/60 flex items-center justify-between">
-              <p className="text-[10px] text-forest-800/70 font-medium truncate max-w-[100px]">
-                {card.subtitle}
-              </p>
-              <svg className="w-12 h-4 shrink-0 overflow-visible opacity-70 group-hover:opacity-100 transition" viewBox="0 0 100 20">
-                <path
-                  d={card.sparkline}
-                  fill="none"
-                  stroke={card.sparkColor}
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-
-            {/* Accent Bar bottom edge */}
-            <div className={`absolute bottom-0 left-0 right-0 h-1 ${card.accentBar} opacity-80`} />
+            {/* Bottom: Subtext */}
+            <p className="text-[10px] text-forest-700 font-medium mt-1 truncate">
+              {card.subtext}
+            </p>
           </div>
         );
       })}

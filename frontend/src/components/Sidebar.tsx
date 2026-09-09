@@ -11,7 +11,8 @@ import {
   History,
   FileSpreadsheet,
   Sliders,
-  Sparkles
+  Sparkles,
+  Award
 } from "lucide-react";
 
 interface SidebarProps {
@@ -24,7 +25,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
-  claimCount = 12,
+  claimCount = 16,
   investigationCount = 5,
 }) => {
   const navItems = [
@@ -41,22 +42,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-64 bg-emerald-950/95 backdrop-blur-xl border-r border-emerald-800/40 text-cream-200 flex flex-col justify-between shrink-0 min-h-screen sticky top-0 z-30 transition-all">
+    <aside className="w-64 bg-gradient-to-b from-emerald-950 via-forest-950 to-emerald-950 border-r border-emerald-800/40 text-cream-200 flex flex-col justify-between shrink-0 min-h-screen sticky top-0 z-30 shadow-2xl transition-all">
       {/* Brand Header */}
-      <div className="p-5 border-b border-emerald-900/60">
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => onSelectTab("dashboard")}>
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-forest-800 to-emerald-950 border border-gold-400/40 shadow-emerald-glow">
+      <div className="p-5 border-b border-emerald-900/70 relative">
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-400/20 to-transparent" />
+        <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => onSelectTab("dashboard")}>
+          <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 via-forest-800 to-emerald-950 border border-gold-400/50 shadow-emerald-glow group-hover:scale-105 transition-transform">
             <ShieldCheck className="w-6 h-6 text-gold-300 drop-shadow-md" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full" />
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-emerald-950" />
           </div>
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="font-extrabold text-base tracking-tight text-white font-sans">FraudGuard</span>
-              <span className="text-xs px-1.5 py-0.2 font-black rounded bg-gold-600/30 text-gold-300 border border-gold-500/40">AI</span>
+              <span className="font-black text-base tracking-tight text-white font-sans">FraudGuard</span>
+              <span className="text-[10px] px-1.5 py-0.2 font-black rounded bg-gold-500/20 text-gold-300 border border-gold-400/40 font-mono">
+                AI
+              </span>
             </div>
-            <p className="text-[10px] text-emerald-300/70 font-medium tracking-wide">
-              Detect · Investigate · Prevent
+            <p className="text-[10px] text-emerald-300/75 font-medium tracking-wide">
+              Enterprise Fraud Defense
             </p>
           </div>
         </div>
@@ -64,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Nav List */}
       <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-400/60">
+        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-400/70">
           Investigation Suite
         </div>
         {navItems.map((item) => {
@@ -74,12 +78,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => onSelectTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group relative ${
                 isActive
-                  ? "bg-gradient-to-r from-emerald-800/80 to-forest-800/90 text-gold-200 border border-gold-400/30 shadow-sm"
-                  : "text-emerald-200/80 hover:bg-emerald-900/40 hover:text-white"
+                  ? "bg-gradient-to-r from-emerald-800/90 via-forest-800/95 to-emerald-800/80 text-gold-200 border border-gold-400/40 shadow-md shadow-emerald-950/50 font-bold"
+                  : "text-emerald-200/80 hover:bg-emerald-900/50 hover:text-white"
               }`}
             >
+              {isActive && (
+                <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-gold-400 rounded-r-full shadow-gold-glow" />
+              )}
               <div className="flex items-center space-x-3">
                 <Icon
                   className={`w-4 h-4 transition-colors ${
@@ -93,8 +100,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition ${
                     isActive
-                      ? "bg-gold-500/20 text-gold-300 border border-gold-400/30"
-                      : "bg-emerald-900/60 text-emerald-300 group-hover:bg-emerald-800"
+                      ? "bg-gold-500/25 text-gold-300 border border-gold-400/40 font-mono"
+                      : "bg-emerald-900/80 text-emerald-300 group-hover:bg-emerald-800 font-mono"
                   }`}
                 >
                   {item.badge}
@@ -104,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {item.pulse && (
                 <span className="flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                 </span>
               )}
             </button>
@@ -112,22 +119,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* Bottom AI Shield Card */}
-      <div className="p-3 m-3 rounded-2xl bg-gradient-to-br from-emerald-900/90 via-forest-900/80 to-emerald-950 border border-emerald-700/40 shadow-glass relative overflow-hidden">
-        <div className="absolute -right-3 -top-3 w-16 h-16 bg-gold-500/10 rounded-full blur-xl pointer-events-none" />
-        <div className="flex items-start space-x-3 mb-2 relative">
-          <div className="p-2 rounded-xl bg-emerald-800/60 border border-emerald-600/40 shadow-inner">
-            <Sparkles className="w-4 h-4 text-gold-300" />
+      {/* Premium 3D AI + Human Judgment Card (Bottom) */}
+      <div className="p-3.5 m-3 rounded-2xl bg-gradient-to-br from-emerald-900 via-forest-900 to-emerald-950 border border-gold-400/40 shadow-[0_8px_24px_rgba(0,0,0,0.5)] relative overflow-hidden group">
+        {/* Specular light highlight */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-300/60 to-transparent pointer-events-none" />
+        <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-gold-500/15 rounded-full blur-xl pointer-events-none group-hover:scale-125 transition-transform" />
+
+        <div className="flex items-start space-x-3 mb-2.5 relative z-10">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-gold-500 to-gold-700 text-forest-950 shadow-md shadow-gold-500/20 shrink-0">
+            <Award className="w-4 h-4 text-forest-950 drop-shadow-sm" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-white tracking-tight">AI + Human Judgment</h4>
-            <p className="text-[11px] text-emerald-200/70 leading-snug">Safer Claims. Fairer Outcomes.</p>
+            <h4 className="text-xs font-black text-white tracking-tight flex items-center space-x-1">
+              <span>AI + Human Judgment</span>
+            </h4>
+            <p className="text-[11px] font-semibold text-gold-300 mt-0.5">
+              Safer Claims. Fairer Outcomes.
+            </p>
           </div>
         </div>
-        <div className="flex items-center justify-between pt-2 border-t border-emerald-800/40 text-[10px]">
-          <span className="text-emerald-400/80 font-mono font-medium">PROD-STYLE</span>
-          <span className="bg-emerald-950/80 text-gold-300/90 px-1.5 py-0.5 rounded border border-gold-500/20 font-mono">
-            v1.0.0
+
+        <p className="text-[10px] text-emerald-200/80 leading-relaxed mb-3 relative z-10">
+          Continuous multimodal risk triaging with mandatory licensed investigator governance.
+        </p>
+
+        <div className="flex items-center justify-between pt-2 border-t border-emerald-800/60 text-[9px] relative z-10 font-mono">
+          <span className="text-emerald-300/80 flex items-center space-x-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>SOC 2 CERTIFIED</span>
+          </span>
+          <span className="bg-emerald-950/90 text-gold-300 px-2 py-0.5 rounded border border-gold-400/30 font-bold">
+            ENTERPRISE
           </span>
         </div>
       </div>

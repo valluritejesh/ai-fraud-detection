@@ -15,122 +15,135 @@ export const DemoScenarioBar: React.FC<DemoScenarioBarProps> = ({
       id: "CLM-SCENARIO-A",
       letter: "A",
       title: "Legitimate Claim",
-      subtitle: "Low Risk",
+      subtitle: "Clean Evidence",
       level: "LOW",
+      score: 5,
+      borderStyle: "hover:border-emerald-500",
+      activeStyle: "border-emerald-600 bg-emerald-500/10 ring-2 ring-emerald-500/30 shadow-emerald-glow",
       badgeColor: "bg-emerald-100 text-emerald-800 border-emerald-300",
-      containerColor: "hover:border-emerald-500 hover:bg-emerald-50/50",
-      activeColor: "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-600/20",
-      score: "5",
+      scorePill: "bg-emerald-600 text-white",
     },
     {
       id: "CLM-SCENARIO-B",
       letter: "B",
       title: "Recycled Invoice",
-      subtitle: "Critical Risk",
+      subtitle: "Cost Inflation",
       level: "CRITICAL",
+      score: 85,
+      borderStyle: "hover:border-rose-500",
+      activeStyle: "border-rose-600 bg-rose-500/10 ring-2 ring-rose-500/30 shadow-[0_0_20px_rgba(239,68,68,0.25)]",
       badgeColor: "bg-rose-100 text-rose-800 border-rose-300",
-      containerColor: "hover:border-rose-500 hover:bg-rose-50/50",
-      activeColor: "border-rose-600 bg-rose-50 ring-2 ring-rose-600/20",
-      score: "85",
+      scorePill: "bg-rose-600 text-white",
     },
     {
       id: "CLM-SCENARIO-C",
       letter: "C",
       title: "Date Conflict",
-      subtitle: "High Risk",
+      subtitle: "Timeline Contradiction",
       level: "HIGH",
-      badgeColor: "bg-amber-100 text-amber-800 border-amber-300",
-      containerColor: "hover:border-amber-500 hover:bg-amber-50/50",
-      activeColor: "border-amber-600 bg-amber-50 ring-2 ring-amber-600/20",
-      score: "70",
+      score: 70,
+      borderStyle: "hover:border-orange-500",
+      activeStyle: "border-orange-600 bg-orange-500/10 ring-2 ring-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.25)]",
+      badgeColor: "bg-orange-100 text-orange-900 border-orange-300",
+      scorePill: "bg-orange-600 text-white",
     },
     {
       id: "CLM-SCENARIO-D",
       letter: "D",
       title: "Ghost Repair",
-      subtitle: "High Risk",
+      subtitle: "Photo/Estimate Mismatch",
       level: "HIGH",
-      badgeColor: "bg-amber-100 text-amber-800 border-amber-300",
-      containerColor: "hover:border-amber-500 hover:bg-amber-50/50",
-      activeColor: "border-amber-600 bg-amber-50 ring-2 ring-amber-600/20",
-      score: "70",
+      score: 70,
+      borderStyle: "hover:border-orange-500",
+      activeStyle: "border-orange-600 bg-orange-500/10 ring-2 ring-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.25)]",
+      badgeColor: "bg-orange-100 text-orange-900 border-orange-300",
+      scorePill: "bg-orange-600 text-white",
     },
     {
       id: "CLM-SCENARIO-E",
       letter: "E",
       title: "Recycled Hash",
-      subtitle: "High Risk",
+      subtitle: "Duplicate Cross-Claim",
       level: "HIGH",
-      badgeColor: "bg-orange-100 text-orange-800 border-orange-300",
-      containerColor: "hover:border-orange-500 hover:bg-orange-50/50",
-      activeColor: "border-orange-600 bg-orange-50 ring-2 ring-orange-600/20",
-      score: "70",
+      score: 70,
+      borderStyle: "hover:border-orange-500",
+      activeStyle: "border-orange-600 bg-orange-500/10 ring-2 ring-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.25)]",
+      badgeColor: "bg-orange-100 text-orange-900 border-orange-300",
+      scorePill: "bg-orange-600 text-white",
     },
     {
       id: "CLM-SCENARIO-F",
       letter: "F",
       title: "Velocity & Injection",
-      subtitle: "High Risk",
+      subtitle: "Adversarial Threat",
       level: "HIGH",
-      badgeColor: "bg-purple-100 text-purple-800 border-purple-300",
-      containerColor: "hover:border-purple-500 hover:bg-purple-50/50",
-      activeColor: "border-purple-600 bg-purple-50 ring-2 ring-purple-600/20",
-      score: "65",
+      score: 65,
+      borderStyle: "hover:border-purple-500",
+      activeStyle: "border-purple-600 bg-purple-500/10 ring-2 ring-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.25)]",
+      badgeColor: "bg-purple-100 text-purple-900 border-purple-300",
+      scorePill: "bg-purple-600 text-white",
     },
   ];
 
   return (
-    <div id="demo-scenarios-bar" className="bg-white/90 backdrop-blur-md rounded-2xl border border-cream-700/80 shadow-card-soft p-4 mb-8">
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+    <div id="demo-scenarios-bar" className="bg-white/95 backdrop-blur-xl rounded-2xl border border-cream-700/80 shadow-card-soft p-4 mb-7 relative">
+      {/* Specular highlight */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold-400/30 to-transparent pointer-events-none rounded-t-2xl" />
+
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3.5">
         {/* Header Label */}
         <div className="flex items-center space-x-3 shrink-0">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-forest-800 text-gold-300 shadow-sm">
-            <Sparkles className="w-4 h-4" />
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-950 text-gold-300 border border-gold-400/40 shadow-sm font-bold text-xs tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-gold-300 animate-pulse" />
+            <span>DEMO SCENARIOS</span>
           </div>
-          <div>
-            <div className="flex items-center space-x-1.5">
-              <span className="font-extrabold text-xs tracking-wider text-emerald-950 uppercase font-sans">
-                DEMO SCENARIOS
-              </span>
-              <span className="text-[10px] bg-gold-100 text-gold-800 font-bold px-1.5 py-0.2 rounded border border-gold-300">
-                A–F MATRIX
-              </span>
-            </div>
-            <p className="text-[11px] text-forest-700 font-medium">
-              Click any benchmark to evaluate multi-agent triaging
-            </p>
+          <div className="text-xs">
+            <span className="font-extrabold text-forest-950">A–F BENCHMARK MATRIX</span>
+            <span className="hidden md:inline text-forest-700 ml-2 font-medium">· Select to inspect dossier</span>
           </div>
         </div>
 
-        {/* Buttons List */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
+        {/* 6 Scenario Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5 flex-1">
           {scenarios.map((s) => {
-            const isSelected = activeScenarioId === s.id;
+            const isActive = activeScenarioId === s.id;
             return (
               <button
                 key={s.id}
                 onClick={() => onSelectScenario(s.id)}
-                className={`p-2.5 rounded-xl border text-left transition-all duration-200 group flex flex-col justify-between ${
-                  isSelected
-                    ? s.activeColor
-                    : `bg-cream-100/80 border-cream-700/70 text-emerald-950 ${s.containerColor}`
+                className={`p-2.5 rounded-xl border text-left transition-all duration-300 relative group overflow-hidden ${
+                  isActive
+                    ? s.activeStyle
+                    : `bg-cream-200/60 border-cream-700/80 hover:bg-white hover:shadow-card-elevated ${s.borderStyle}`
                 }`}
               >
+                {/* Top Row: Letter badge + Score pill */}
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="w-5 h-5 rounded-lg bg-emerald-900 text-gold-200 font-black text-[10px] flex items-center justify-center font-mono">
+                  <div
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono font-black text-xs transition-colors ${
+                      isActive ? "bg-forest-950 text-gold-300" : "bg-forest-900/10 text-forest-900 group-hover:bg-forest-900 group-hover:text-white"
+                    }`}
+                  >
                     {s.letter}
-                  </span>
-                  <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${s.badgeColor}`}>
+                  </div>
+                  <span className={`px-1.5 py-0.2 rounded font-mono font-bold text-[10px] ${s.scorePill}`}>
                     {s.score}
                   </span>
                 </div>
-                <div>
-                  <p className="text-xs font-bold tracking-tight text-emerald-950 group-hover:text-emerald-800 truncate">
-                    {s.title}
-                  </p>
-                  <p className="text-[10px] text-forest-700 font-medium truncate">
+
+                {/* Scenario Title */}
+                <div className="font-bold text-xs text-forest-950 truncate tracking-tight group-hover:text-emerald-850">
+                  {s.title}
+                </div>
+
+                {/* Subtitle & Level */}
+                <div className="flex items-center justify-between mt-1 text-[10px]">
+                  <span className="text-forest-700 truncate font-medium text-[9px]">
                     {s.subtitle}
-                  </p>
+                  </span>
+                  <span className={`px-1 py-0.2 rounded text-[8px] font-black uppercase font-mono border ${s.badgeColor}`}>
+                    {s.level}
+                  </span>
                 </div>
               </button>
             );

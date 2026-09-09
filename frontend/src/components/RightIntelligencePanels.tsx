@@ -1,14 +1,21 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Activity,
-  Cpu,
   CheckCircle2,
   Clock,
   ExternalLink,
   ShieldCheck,
   Zap,
-  Lock
+  Server,
+  Database,
+  Cpu,
+  FileBox,
+  Scale
 } from "lucide-react";
+import { AgentOrchestrationGraph } from "./primitives/AgentOrchestrationGraph";
+import { healthApi } from "../services/api";
+
+import { SystemHealth } from "../types";
 
 interface RightIntelligencePanelsProps {
   onSelectAgentStatus?: () => void;
@@ -21,120 +28,152 @@ export const RightIntelligencePanels: React.FC<RightIntelligencePanelsProps> = (
   onSyncGuidewire,
   onSelectAuditLog,
 }) => {
-  const agents = [
-    { name: "Document Agent", role: "Pydantic Schema & Injection Redaction", status: "Active" },
-    { name: "Vision Agent", role: "Damage Panel Localization & Severity", status: "Active" },
-    { name: "Historical Agent", role: "Recycled Invoices & Velocity Spikes", status: "Active" },
-    { name: "Rules Engine", role: "Deterministic Rules (R01–R05)", status: "Active" },
-    { name: "Verification Agent", role: "Cross-Evidence Conflict Matrix", status: "Active" },
-    { name: "Fraud Risk Engine", role: "0–100 Composite Weighted Scoring", status: "Active" },
-  ];
+  const [telemetry, setTelemetry] = useState<SystemHealth | null>(null);
 
-  const recentActivities = [
-    { text: "AI Analysis completed for CLM-SCENARIO-B (Score: 85, CRITICAL)", time: "2m ago", type: "alert" },
-    { text: "Human override applied by Lead Vance (+7 pts)", time: "5m ago", type: "override" },
-    { text: "Guidewire adapter synced GW-CC-SCENARIO-B", time: "9m ago", type: "sync" },
-    { text: "Scenario F prompt-injection payload sanitized", time: "14m ago", type: "security" },
+  useEffect(() => {
+    healthApi
+      .getHealth()
+      .then((data) => setTelemetry(data))
+      .catch((err) => console.error("Health check error:", err));
+  }, []);
+
+  const recentEvents = [
+    {
+      title: "AI Analysis completed for CLM-SCENARIO-B",
+      meta: "Score: 85 · CRITICAL · 4 Rules Triggered",
+      time: "2m ago",
+      color: "text-rose-600",
+    },
+    {
+      title: "Human override applied by Lead Vance",
+      meta: "+7 pts · Adjusted to 92 · Staged collision confirmed",
+      time: "5m ago",
+      color: "text-gold-700",
+    },
+    {
+      title: "Core System synced: GW-CC-SCENARIO-B",
+      meta: "Guidewire Cloud REST Adapter status: SYNCHRONIZED",
+      time: "9m ago",
+      color: "text-emerald-700",
+    },
+    {
+      title: "Scenario F prompt-injection payload sanitized",
+      meta: "Adversarial payload neutralized & SHA-256 logged",
+      time: "14m ago",
+      color: "text-purple-700",
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Panel 1: System Health Card */}
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-cream-700/80 p-5 shadow-card-soft">
-        <div className="flex items-center justify-between pb-3 border-b border-cream-600/60 mb-4">
+    <div className="space-y-5">
+      {/* 1. Active AI Orchestration Visualization */}
+      <AgentOrchestrationGraph onSelectAgent={onSelectAgentStatus} />
+
+      {/* 2. System Health & Infrastructure */}
+      <div className="p-4 rounded-2xl bg-white/95 backdrop-blur-xl border border-cream-700/80 shadow-card-soft">
+        <div className="flex items-center justify-between pb-2.5 border-b border-cream-600/70 mb-3">
           <div className="flex items-center space-x-2">
-            <Activity className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 font-sans">
+            <Server className="w-4 h-4 text-emerald-800" />
+            <h3 className="text-xs font-black uppercase tracking-wider text-forest-950 font-sans">
               System Health
             </h3>
           </div>
-          <span className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
+          <span className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-mono font-bold">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>OPERATIONAL</span>
+            <span>{telemetry?.status || "OPERATIONAL"}</span>
           </span>
         </div>
 
-        <div className="space-y-2.5 text-xs">
-          {[
-            { label: "API Services", val: "Online (200 OK)", icon: CheckCircle2 },
-            { label: "Database", val: "SQLite / Azure SQL (< 4ms)", icon: CheckCircle2 },
-            { label: "AI Agents", val: "6 / 6 Synchronized", icon: CheckCircle2 },
-            { label: "Evidence Storage", val: "SHA-256 Protected", icon: Lock },
-          ].map((item, i) => {
-            const Icon = item.icon;
-            return (
-              <div key={i} className="flex items-center justify-between py-1 border-b border-cream-600/30 text-emerald-950">
-                <span className="text-forest-800 font-medium">{item.label}</span>
-                <span className="flex items-center space-x-1 text-[11px] font-semibold text-emerald-700">
-                  <Icon className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{item.val}</span>
-                </span>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="p-2 rounded-xl bg-cream-200/60 border border-cream-700/80 flex items-center justify-between">
+            <div className="flex items-center space-x-1.5 text-forest-900 font-bold text-[11px]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>API Services</span>
+            </div>
+            <span className="text-[9px] font-mono text-emerald-700 font-bold">LIVE</span>
+          </div>
+
+          <div className="p-2 rounded-xl bg-cream-200/60 border border-cream-700/80 flex items-center justify-between">
+            <div className="flex items-center space-x-1.5 text-forest-900 font-bold text-[11px]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Database</span>
+            </div>
+            <span className="text-[9px] font-mono text-forest-700 font-bold">
+              {telemetry?.database ? `${telemetry.database.latency_ms}ms` : "1.9ms"}
+            </span>
+          </div>
+
+          <div className="p-2 rounded-xl bg-cream-200/60 border border-cream-700/80 flex items-center justify-between">
+            <div className="flex items-center space-x-1.5 text-forest-900 font-bold text-[11px]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>AI Agents</span>
+            </div>
+            <span className="text-[9px] font-mono text-emerald-700 font-bold">6/6</span>
+          </div>
+
+          <div className="p-2 rounded-xl bg-cream-200/60 border border-cream-700/80 flex items-center justify-between">
+            <div className="flex items-center space-x-1.5 text-forest-900 font-bold text-[11px]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>File Storage</span>
+            </div>
+            <span className="text-[9px] font-mono text-emerald-700 font-bold">SYNC</span>
+          </div>
         </div>
       </div>
 
-      {/* Panel 2: Active Agents Card */}
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-cream-700/80 p-5 shadow-card-soft">
-        <div className="flex items-center justify-between pb-3 border-b border-cream-600/60 mb-3">
+      {/* 3. Recent Intelligence Activity */}
+      <div className="p-4 rounded-2xl bg-white/95 backdrop-blur-xl border border-cream-700/80 shadow-card-soft">
+        <div className="flex items-center justify-between pb-2.5 border-b border-cream-600/70 mb-3">
           <div className="flex items-center space-x-2">
-            <Cpu className="w-4 h-4 text-forest-800" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 font-sans">
-              Active Agents
+            <Clock className="w-4 h-4 text-forest-800" />
+            <h3 className="text-xs font-black uppercase tracking-wider text-forest-950 font-sans">
+              Recent Intelligence Events
             </h3>
           </div>
-          <span className="text-[10px] font-mono bg-cream-500 text-forest-900 px-2 py-0.5 rounded font-bold border border-cream-700">
-            6 / 6 ONLINE
-          </span>
-        </div>
-
-        <div className="space-y-2">
-          {agents.map((ag, i) => (
-            <div key={i} className="p-2.5 rounded-xl bg-cream-300/40 border border-cream-600/60 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-emerald-950">{ag.name}</p>
-                <p className="text-[10px] text-forest-700 font-medium truncate max-w-[170px]">{ag.role}</p>
-              </div>
-              <span className="flex items-center space-x-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.2 rounded border border-emerald-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>Active</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Panel 3: Recent Activity Feed */}
-      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-cream-700/80 p-5 shadow-card-soft">
-        <div className="flex items-center space-x-2 pb-3 border-b border-cream-600/60 mb-3">
-          <Clock className="w-4 h-4 text-forest-800" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 font-sans">
-            Recent Intelligence Events
-          </h3>
+          <button
+            onClick={onSelectAuditLog}
+            className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 transition flex items-center space-x-1"
+          >
+            <span>Full Audit</span>
+            <ExternalLink className="w-2.5 h-2.5" />
+          </button>
         </div>
 
         <div className="space-y-2.5">
-          {recentActivities.map((act, i) => (
-            <div key={i} className="p-2.5 rounded-xl bg-cream-300/40 border border-cream-600/60 text-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-emerald-950 text-[11px] leading-snug">{act.text}</span>
+          {recentEvents.map((evt, idx) => (
+            <div
+              key={idx}
+              className="p-2.5 rounded-xl bg-cream-200/60 border border-cream-700/80 text-xs space-y-1 hover:bg-cream-300/60 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className={`font-bold text-[11px] leading-snug ${evt.color}`}>
+                  {evt.title}
+                </span>
+                <span className="text-[9px] text-forest-700 font-mono shrink-0">
+                  {evt.time}
+                </span>
               </div>
-              <p className="text-[10px] text-forest-700/80 font-mono text-right">{act.time}</p>
+              <p className="text-[10px] text-forest-800/80 font-medium">{evt.meta}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Panel 4: Governance Callout Card */}
-      <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-900 via-forest-900 to-emerald-950 text-white border border-emerald-700/40 shadow-sm relative overflow-hidden">
+      {/* 4. Human Governance & Compliance Notice */}
+      <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950 via-forest-900 to-emerald-950 text-white border border-emerald-700/40 shadow-md relative overflow-hidden">
         <div className="flex items-center space-x-2 text-gold-300 mb-1.5">
-          <ShieldCheck className="w-4 h-4" />
-          <span className="text-xs font-bold uppercase tracking-wide">Human Governance</span>
+          <Scale className="w-4 h-4" />
+          <span className="text-xs font-bold uppercase tracking-wider font-mono">
+            Human Governance
+          </span>
         </div>
-        <p className="text-[11px] text-emerald-100/80 leading-relaxed">
-          AI agents calculate risk recommendations; legal claim denials and approvals are reserved exclusively for licensed human investigators.
+        <p className="text-[11px] text-emerald-100/90 leading-relaxed">
+          AI agents calculate risk recommendations. Binding claim approvals, denials, and legal escalations require explicit confirmation by licensed human investigators.
         </p>
+        <div className="mt-2 pt-2 border-t border-emerald-800/60 flex items-center justify-between text-[10px] text-gold-300 font-mono">
+          <span>AI recommends.</span>
+          <span className="font-bold text-white">Human decides.</span>
+        </div>
       </div>
     </div>
   );

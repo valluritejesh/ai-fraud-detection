@@ -77,10 +77,14 @@ export const App: React.FC = () => {
 
     if (tab === "investigations") {
       if (!selectedClaimDetail && claims.length > 0) {
-        // Pick the first high or critical risk claim
-        const highRisk = claims.find(
-          (c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL" || (c.final_risk_level ?? c.risk_level) === "HIGH"
-        );
+        // Pick the highest risk claim (Scenario B or critical)
+        const highRisk =
+          claims.find((c) => c.id === "CLM-SCENARIO-B") ||
+          claims.find(
+            (c) =>
+              (c.final_risk_level ?? c.risk_level) === "CRITICAL" ||
+              (c.final_risk_level ?? c.risk_level) === "HIGH"
+          );
         fetchClaimDetail(highRisk ? highRisk.id : claims[0].id);
       }
     } else {
@@ -90,11 +94,19 @@ export const App: React.FC = () => {
   };
 
   const criticalCount = claims.filter(
-    (c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL" || (c.final_risk_level ?? c.risk_level) === "HIGH"
+    (c) =>
+      (c.final_risk_level ?? c.risk_level) === "CRITICAL" ||
+      (c.final_risk_level ?? c.risk_level) === "HIGH"
   ).length;
 
+  const featuredClaim =
+    claims.find((c) => c.id === "CLM-SCENARIO-B") ||
+    claims.find((c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL") ||
+    claims[0] ||
+    null;
+
   return (
-    <div className="min-h-screen bg-cream-100 flex flex-row font-sans text-forest-900 selection:bg-gold-200 selection:text-forest-900">
+    <div className="min-h-screen bg-cream-500 flex flex-row font-sans text-forest-900 selection:bg-gold-200 selection:text-forest-900">
       {/* Left Persistent Navigation Sidebar */}
       <Sidebar
         currentTab={currentTab}
@@ -117,7 +129,7 @@ export const App: React.FC = () => {
         />
 
         {/* Dynamic Main Body */}
-        <main className="flex-1 p-6 md:p-8 lg:p-10 max-w-[1720px] w-full mx-auto space-y-8">
+        <main className="flex-1 p-5 md:p-6 lg:p-7 max-w-[1720px] w-full mx-auto space-y-6">
           {/* Claim Detail Dossier Workspace */}
           {selectedClaimDetail ? (
             <ClaimDetailView
@@ -150,19 +162,20 @@ export const App: React.FC = () => {
                     const el = document.getElementById("demo-scenarios-bar");
                     if (el) el.scrollIntoView({ behavior: "smooth" });
                   }}
+                  featuredClaim={featuredClaim}
                 />
               )}
 
               {/* 6 Floating KPI Cards with Trends & Micro Sparklines */}
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-700" />
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-forest-800">
-                      Portfolio Performance & Exposure Analytics
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                    <h2 className="text-xs font-black uppercase tracking-wider text-forest-950 font-mono">
+                      Portfolio Performance & Exposure Intelligence
                     </h2>
                   </div>
-                  <span className="text-[11px] font-medium text-forest-700">
+                  <span className="text-[11px] font-mono text-forest-700">
                     Real-time multi-agent consensus metrics
                   </span>
                 </div>
@@ -170,11 +183,12 @@ export const App: React.FC = () => {
               </div>
 
               {/* Primary Workspace Grid: Claims Queue (Left) + Intelligence Panels (Right) */}
-              <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-                {/* Claims Queue Table (8 cols on XL, 12 on smaller) */}
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                {/* Claims Queue Table (8 cols on XL) */}
                 <div className="xl:col-span-8 space-y-4">
                   <ClaimQueue
                     claims={claims}
+                    searchQuery={searchQuery}
                     onSelectClaim={(id) => fetchClaimDetail(id)}
                     onAnalyzeClaim={handleAnalyzeClaim}
                     analyzingClaimId={analyzingClaimId}
@@ -182,8 +196,8 @@ export const App: React.FC = () => {
                   />
                 </div>
 
-                {/* Right Intelligence Panels (4 cols on XL, 12 on smaller) */}
-                <div className="xl:col-span-4 space-y-6">
+                {/* Right Intelligence Panels (4 cols on XL) */}
+                <div className="xl:col-span-4 space-y-5">
                   <RightIntelligencePanels
                     onSelectAgentStatus={() => setCurrentTab("health")}
                     onSelectAuditLog={() => setCurrentTab("health")}
@@ -194,19 +208,19 @@ export const App: React.FC = () => {
           )}
         </main>
 
-        {/* Footer */}
-        <footer className="mt-auto border-t border-cream-700/80 bg-white/70 backdrop-blur-md px-8 py-5 text-xs text-forest-700 flex flex-col md:flex-row items-center justify-between gap-3">
+        {/* Executive Footer */}
+        <footer className="mt-auto border-t border-cream-700/80 bg-white/80 backdrop-blur-md px-8 py-4 text-xs text-forest-700 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2 font-medium">
-            <span className="font-semibold text-emerald-950">FraudGuard AI Enterprise v2.4</span>
-            <span className="text-cream-800">·</span>
-            <span>Multi-Agent Claims Defense Architecture</span>
-            <span className="text-cream-800">·</span>
-            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-semibold border border-emerald-300">
+            <span className="font-extrabold text-forest-950">FraudGuard AI Enterprise v2.4</span>
+            <span className="text-cream-700">·</span>
+            <span>Multi-Agent Multimodal Claims Defense Platform</span>
+            <span className="text-cream-700">·</span>
+            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300 font-mono">
               Audit Grade
             </span>
           </div>
-          <div className="text-[11px] text-forest-600">
-            Powered by Vision, Document, Pattern & Rules Agents · ISO 27001 & SOC 2 Type II Certified
+          <div className="text-[11px] text-forest-600 font-mono">
+            Powered by Document, Vision, Pattern, Rules & Risk Agents · ISO 27001 & SOC 2 Type II
           </div>
         </footer>
       </div>

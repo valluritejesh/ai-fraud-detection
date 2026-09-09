@@ -4,10 +4,10 @@ import {
   ShieldCheck,
   AlertTriangle,
   Flame,
-  ShieldAlert,
   Scale,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Activity
 } from "lucide-react";
 import { Claim } from "../types";
 
@@ -52,7 +52,10 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
       icon: FileText,
       iconBg: "bg-forest-900/10 text-forest-800 border-forest-700/20",
       sparkColor: "#0B5D4F",
-      sparkPath: "M0 25 Q15 28 30 18 T60 12 T90 20 T120 10",
+      sparkFill: "rgba(11, 93, 79, 0.15)",
+      sparkPath: "M0 25 Q15 28 30 18 T60 12 T90 20 T120 10 L120 35 L0 35 Z",
+      strokePath: "M0 25 Q15 28 30 18 T60 12 T90 20 T120 10",
+      hasPulse: false,
     },
     {
       title: "LOW RISK",
@@ -63,7 +66,11 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
       icon: ShieldCheck,
       iconBg: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
       sparkColor: "#10B981",
-      sparkPath: "M0 15 Q20 8 40 18 T80 10 T100 12 T120 6",
+      sparkFill: "rgba(16, 185, 129, 0.15)",
+      sparkPath: "M0 15 Q20 8 40 18 T80 10 T100 12 T120 6 L120 35 L0 35 Z",
+      strokePath: "M0 15 Q20 8 40 18 T80 10 T100 12 T120 6",
+      hasPulse: true,
+      pulseColor: "bg-emerald-500",
     },
     {
       title: "MEDIUM RISK",
@@ -74,7 +81,10 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
       icon: AlertTriangle,
       iconBg: "bg-amber-500/15 text-amber-700 border-amber-500/30",
       sparkColor: "#E5A11A",
-      sparkPath: "M0 20 Q30 20 60 14 T90 16 T120 18",
+      sparkFill: "rgba(229, 161, 26, 0.15)",
+      sparkPath: "M0 20 Q30 20 60 14 T90 16 T120 18 L120 35 L0 35 Z",
+      strokePath: "M0 20 Q30 20 60 14 T90 16 T120 18",
+      hasPulse: false,
     },
     {
       title: "HIGH RISK",
@@ -85,7 +95,10 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
       icon: AlertTriangle,
       iconBg: "bg-orange-500/15 text-orange-700 border-orange-500/30",
       sparkColor: "#F97316",
-      sparkPath: "M0 28 Q25 24 50 16 T85 10 T120 8",
+      sparkFill: "rgba(249, 115, 22, 0.15)",
+      sparkPath: "M0 28 Q25 24 50 16 T85 10 T120 8 L120 35 L0 35 Z",
+      strokePath: "M0 28 Q25 24 50 16 T85 10 T120 8",
+      hasPulse: false,
     },
     {
       title: "CRITICAL RISK",
@@ -96,7 +109,11 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
       icon: Flame,
       iconBg: "bg-rose-500/15 text-rose-600 border-rose-500/30",
       sparkColor: "#EF4444",
-      sparkPath: "M0 30 Q20 28 50 18 T90 8 T120 4",
+      sparkFill: "rgba(239, 68, 68, 0.18)",
+      sparkPath: "M0 30 Q20 28 50 18 T90 8 T120 4 L120 35 L0 35 Z",
+      strokePath: "M0 30 Q20 28 50 18 T90 8 T120 4",
+      hasPulse: true,
+      pulseColor: "bg-rose-500",
     },
     {
       title: "SIU QUEUE",
@@ -107,48 +124,57 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
       icon: Scale,
       iconBg: "bg-gold-500/20 text-gold-700 border-gold-400/40",
       sparkColor: "#D9A441",
-      sparkPath: "M0 24 Q30 20 60 12 T90 6 T120 8",
+      sparkFill: "rgba(217, 164, 65, 0.15)",
+      sparkPath: "M0 24 Q30 20 60 12 T90 6 T120 8 L120 35 L0 35 Z",
+      strokePath: "M0 24 Q30 20 60 12 T90 6 T120 8",
+      hasPulse: false,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5 mb-7">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
           <div
             key={idx}
-            className="p-4 rounded-2xl bg-white/95 backdrop-blur-xl border border-cream-700/80 shadow-card-soft hover:shadow-card-elevated hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group"
+            className="p-3.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-cream-700/80 shadow-card-soft hover:shadow-card-elevated hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden group"
           >
             {/* Top Specular Line */}
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cream-500 to-transparent pointer-events-none" />
 
-            {/* Subtle background sparkline */}
+            {/* Filled Area Background Sparkline */}
             <svg
-              className="absolute right-0 bottom-0 w-28 h-12 pointer-events-none opacity-30 group-hover:opacity-50 transition-opacity"
+              className="absolute right-0 bottom-0 w-28 h-12 pointer-events-none opacity-30 group-hover:opacity-60 transition-opacity"
               viewBox="0 0 120 35"
               fill="none"
             >
+              <path d={card.sparkPath} fill={card.sparkFill} />
               <path
-                d={card.sparkPath}
+                d={card.strokePath}
                 stroke={card.sparkColor}
-                strokeWidth="2.5"
+                strokeWidth="2"
                 strokeLinecap="round"
               />
             </svg>
 
-            {/* Top row: Title + Icon */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-forest-700 font-mono">
-                {card.title}
-              </span>
+            {/* Top row: Title + Icon with optional pulse */}
+            <div className="flex items-center justify-between mb-1.5 relative z-10">
+              <div className="flex items-center space-x-1.5">
+                {card.hasPulse && (
+                  <span className={`w-2 h-2 rounded-full ${card.pulseColor} animate-pulse`} />
+                )}
+                <span className="text-[10px] font-black uppercase tracking-wider text-forest-700 font-mono">
+                  {card.title}
+                </span>
+              </div>
               <div className={`p-1.5 rounded-lg border ${card.iconBg}`}>
                 <Icon className="w-3.5 h-3.5" />
               </div>
             </div>
 
-            {/* Middle row: Big Metric Number */}
-            <div className="flex items-baseline space-x-2">
+            {/* Middle row: Metric Number + Trend */}
+            <div className="flex items-baseline space-x-2 relative z-10">
               <span className="text-2xl lg:text-3xl font-black font-mono tracking-tight text-forest-950">
                 {card.value}
               </span>
@@ -158,7 +184,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({ claims }) => {
             </div>
 
             {/* Bottom: Subtext */}
-            <p className="text-[10px] text-forest-700 font-medium mt-1 truncate">
+            <p className="text-[10px] text-forest-700 font-medium mt-1 truncate relative z-10">
               {card.subtext}
             </p>
           </div>

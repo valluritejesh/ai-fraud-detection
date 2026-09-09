@@ -21,6 +21,7 @@ export const App: React.FC = () => {
   const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
   const [isIntakeModalOpen, setIsIntakeModalOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [previewScenarioId, setPreviewScenarioId] = useState<string>("CLM-SCENARIO-B");
 
   const fetchClaims = async () => {
     setLoading(true);
@@ -77,15 +78,12 @@ export const App: React.FC = () => {
 
     if (tab === "investigations") {
       if (!selectedClaimDetail && claims.length > 0) {
-        // Pick the highest risk claim (Scenario B or critical)
-        const highRisk =
+        // Pick the active scenario or first high risk claim
+        const target =
+          claims.find((c) => c.id === previewScenarioId) ||
           claims.find((c) => c.id === "CLM-SCENARIO-B") ||
-          claims.find(
-            (c) =>
-              (c.final_risk_level ?? c.risk_level) === "CRITICAL" ||
-              (c.final_risk_level ?? c.risk_level) === "HIGH"
-          );
-        fetchClaimDetail(highRisk ? highRisk.id : claims[0].id);
+          claims[0];
+        fetchClaimDetail(target.id);
       }
     } else {
       setSelectedClaimId(null);
@@ -100,8 +98,8 @@ export const App: React.FC = () => {
   ).length;
 
   const featuredClaim =
+    claims.find((c) => c.id === previewScenarioId) ||
     claims.find((c) => c.id === "CLM-SCENARIO-B") ||
-    claims.find((c) => (c.final_risk_level ?? c.risk_level) === "CRITICAL") ||
     claims[0] ||
     null;
 
@@ -129,7 +127,7 @@ export const App: React.FC = () => {
         />
 
         {/* Dynamic Main Body */}
-        <main className="flex-1 p-5 md:p-6 lg:p-7 max-w-[1720px] w-full mx-auto space-y-6">
+        <main className="flex-1 p-4 md:p-5 lg:p-6 max-w-[1720px] w-full mx-auto space-y-5">
           {/* Claim Detail Dossier Workspace */}
           {selectedClaimDetail ? (
             <ClaimDetailView
@@ -150,8 +148,9 @@ export const App: React.FC = () => {
             <>
               {/* Demo Scenario Jumper Bar */}
               <DemoScenarioBar
-                onSelectScenario={(scenarioId) => fetchClaimDetail(scenarioId)}
-                activeScenarioId={selectedClaimId}
+                onSelectScenario={(scenarioId) => setPreviewScenarioId(scenarioId)}
+                onOpenDossier={(scenarioId) => fetchClaimDetail(scenarioId)}
+                activeScenarioId={previewScenarioId}
               />
 
               {/* Luxury 3D AI Hero Section */}
@@ -162,12 +161,13 @@ export const App: React.FC = () => {
                     const el = document.getElementById("demo-scenarios-bar");
                     if (el) el.scrollIntoView({ behavior: "smooth" });
                   }}
+                  onOpenDossier={(claimId) => fetchClaimDetail(claimId)}
                   featuredClaim={featuredClaim}
                 />
               )}
 
               {/* 6 Floating KPI Cards with Trends & Micro Sparklines */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
@@ -183,7 +183,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* Primary Workspace Grid: Claims Queue (Left) + Intelligence Panels (Right) */}
-              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
                 {/* Claims Queue Table (8 cols on XL) */}
                 <div className="xl:col-span-8 space-y-4">
                   <ClaimQueue
@@ -209,7 +209,7 @@ export const App: React.FC = () => {
         </main>
 
         {/* Executive Footer */}
-        <footer className="mt-auto border-t border-cream-700/80 bg-white/80 backdrop-blur-md px-8 py-4 text-xs text-forest-700 flex flex-col md:flex-row items-center justify-between gap-3">
+        <footer className="mt-auto border-t border-cream-700/80 bg-white/80 backdrop-blur-md px-8 py-3.5 text-xs text-forest-700 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2 font-medium">
             <span className="font-extrabold text-forest-950">FraudGuard AI Enterprise v2.4</span>
             <span className="text-cream-700">·</span>

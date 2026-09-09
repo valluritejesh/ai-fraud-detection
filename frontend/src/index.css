@@ -157,6 +157,16 @@
   animation: dashFlow 2s linear infinite;
 }
 
+@keyframes radarSweep {
+  0% { transform: translateY(-100%); opacity: 0.1; }
+  50% { opacity: 0.7; }
+  100% { transform: translateY(100%); opacity: 0.1; }
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 3.5s ease-in-out infinite;
+}
+
 /* Subtle Shimmer Sweep */
 @keyframes shimmer {
   0% {

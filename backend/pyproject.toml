@@ -1,0 +1,29 @@
+[project]
+name = "ai-fraud-detection-backend"
+version = "1.0.0"
+description = "AI Fraud Detection Agent Backend Platform"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.31.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "sqlalchemy>=2.0.35",
+    "aiosqlite>=0.20.0",
+    "python-multipart>=0.0.12",
+    "aiofiles>=24.1.0",
+    "httpx>=0.27.2",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
+    "pyjwt>=2.9.0",
+    "passlib[bcrypt]>=1.7.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]

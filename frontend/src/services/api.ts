@@ -1,14 +1,32 @@
 import axios from "axios";
 import { Claim, ClaimDetail, SystemHealth, AuditLog } from "../types";
 
+const getApiBaseUrl = (): string => {
+  // 1. Explicit environment variable override
+  const envBase = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envBase) {
+    return envBase;
+  }
+  // 2. Standalone Docker frontend running on port 8080 targets backend on port 8000
+  if (typeof window !== "undefined" && window.location.port === "8080") {
+    return `${window.location.protocol}//${window.location.hostname}:8000/api/v1`;
+  }
+  // 3. Default: Vite dev server (port 5173 proxied to 8000) or FastAPI serving SPA on port 8000
+  return "/api/v1";
+};
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: getApiBaseUrl(),
   timeout: 30000,
 });
 
 export const claimsApi = {
   listClaims: async (params?: { status?: string; risk_level?: string }): Promise<Claim[]> => {
     const res = await api.get<Claim[]>("/claims", { params });
+    if (!Array.isArray(res.data)) {
+      console.warn("claimsApi.listClaims received non-array data:", res.data);
+      return [];
+    }
     return res.data;
   },
 
@@ -92,8 +110,10 @@ export const investigationApi = {
 
   getStreamUrl: (investigationId: string) => {
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    // If running on vite port 5173 or direct 8000, construct proper websocket endpoint
-    const host = window.location.host;
+    let host = window.location.host;
+    if (typeof window !== "undefined" && window.location.port === "8080") {
+      host = `${window.location.hostname}:8000`;
+    }
     return `${proto}//${host}/api/v1/investigations/${investigationId}/stream`;
   },
 };

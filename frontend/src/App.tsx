@@ -52,7 +52,7 @@ export const App: React.FC = () => {
     setLoading(true);
     try {
       const data = await claimsApi.listClaims();
-      setClaims(data);
+      setClaims(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load claims:", err);
     } finally {
@@ -99,6 +99,8 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const safeClaims = Array.isArray(claims) ? claims : [];
+
   const handleSelectTab = (tab: string) => {
     if (tab === "new_claim") {
       setIsIntakeModalOpen(true);
@@ -109,11 +111,11 @@ export const App: React.FC = () => {
     syncUrl(tab, null);
 
     if (tab === "investigations") {
-      if (!selectedClaimDetail && claims.length > 0) {
+      if (!selectedClaimDetail && safeClaims.length > 0) {
         const target =
-          claims.find((c) => c.id === previewScenarioId) ||
-          claims.find((c) => c.id === "CLM-SCENARIO-B") ||
-          claims[0];
+          safeClaims.find((c) => c.id === previewScenarioId) ||
+          safeClaims.find((c) => c.id === "CLM-SCENARIO-B") ||
+          safeClaims[0];
         fetchClaimDetail(target.id);
       }
     } else {
@@ -122,16 +124,16 @@ export const App: React.FC = () => {
     }
   };
 
-  const criticalCount = claims.filter(
+  const criticalCount = safeClaims.filter(
     (c) =>
       (c.final_risk_level ?? c.risk_level) === "CRITICAL" ||
       (c.final_risk_level ?? c.risk_level) === "HIGH"
   ).length;
 
   const featuredClaim =
-    claims.find((c) => c.id === previewScenarioId) ||
-    claims.find((c) => c.id === "CLM-SCENARIO-B") ||
-    claims[0] ||
+    safeClaims.find((c) => c.id === previewScenarioId) ||
+    safeClaims.find((c) => c.id === "CLM-SCENARIO-B") ||
+    safeClaims[0] ||
     null;
 
   return (
@@ -140,7 +142,7 @@ export const App: React.FC = () => {
       <Sidebar
         currentTab={selectedClaimDetail ? "investigations" : currentTab}
         onSelectTab={handleSelectTab}
-        claimCount={claims.length}
+        claimCount={safeClaims.length}
         investigationCount={criticalCount}
       />
 

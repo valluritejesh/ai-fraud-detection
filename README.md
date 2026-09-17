@@ -1,13 +1,14 @@
-# FraudGuard AI — Enterprise AI Fraud Detection & Investigation Platform
+# FraudGuard AI - Enterprise AI Fraud Detection & Investigation Platform
 
-> **An autonomous, explainable, multimodal insurance fraud investigation platform.**  
-> Combines deterministic business rules, computer vision damage inspection, historical statistical anomaly modeling, and cross-evidence reconciliation to produce transparent fraud risk scores (0–100) while strictly preserving human investigator authority.
+> **An autonomous, explainable, multimodal insurance fraud investigation platform powered by LangGraph & LLMs.**  
+> Combines real-time DAG orchestration, parallel evidence extraction (Document, Vision, Historical Pattern Agents), LLM unstructured reasoning synthesis, deterministic business rules, and an authoritative risk engine (0â€“100) while strictly preserving human investigator authority.
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.2+-purple.svg)](https://langchain-ai.github.io/langgraph/)
 [![React](https://img.shields.io/badge/React-18+-61dafb.svg)](https://reactjs.org)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4+-38bdf8.svg)](https://tailwindcss.com)
-[![Tests](https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-32%2F32%20Passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)]()
 
 ---
@@ -18,168 +19,100 @@ Insurance claims fraud accounts for over **\$300 billion in annual losses** glob
 
 ### The Fundamental Rule:
 > **The system NEVER automatically convicts or denies a claim based solely on an AI prediction.**  
-> AI models generate explainable risk signals, calculate transparent multi-agent composite scores, and route high-risk files to the **Special Investigation Unit (SIU)**. Only a licensed human investigator or adjuster makes the final binding decision.
+> AI models generate explainable risk signals, extract structured facts, synthesize multi-agent findings, and route high-risk files to the **Special Investigation Unit (SIU)**. The deterministic risk engine mathematically bounds the 0â€“100 risk score, and only a licensed human investigator or adjuster makes the final binding decision.
+>
+> **"AI recommends. Human decides."**
 
 ---
 
-## 2. System Architecture
+## 2. System Architecture: LangGraph 13-Node DAG
 
+FraudGuard AI employs a hybrid architecture where **LangGraph** orchestrates parallel evidence analysis, deterministic rule evaluation, LLM synthesis, authoritative risk calculation, and human investigator gating.
+
+```mermaid
+graph TD
+    A[Claim Intake: POST /api/v1/claims] --> B[collect_evidence]
+    
+    subgraph Parallel Evidence Agents
+        B --> C1[document_analysis: Doc Agent + LLM]
+        B --> C2[vision_analysis: Vision Agent]
+        B --> C3[historical_analysis: Historical Pattern Agent]
+    end
+    
+    C1 --> D[rules_analysis: Fan-In Deterministic Rules Engine]
+    C2 --> D
+    C3 --> D
+    
+    D --> E[verification: Verification Agent + LLM Correlation]
+    E --> F[llm_investigation_synthesis: LLM Multi-Agent Synthesis]
+    F --> G[risk_calculation: Authoritative Deterministic Risk Engine]
+    G --> H[risk_routing: Automated Triage & Routing]
+    H --> I[human_review: Licensed Investigator Review Gate]
+    I --> J[audit: Immutable Audit Logging]
+    J --> K[claims_sync: External Claims Sync Adapter]
 ```
-                  +-------------------------------------------------------+
-                  |                 CLAIM INTAKE LAYER                    |
-                  |     (Web Portal / REST API: PDF, JPG, JSON, Forms)    |
-                  +---------------------------+---------------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |               EVIDENCE STORAGE REPOSITORY             |
-                  |        (SHA-256 Checksums, MIME Sniffing, WORM)       |
-                  +---------------------------+---------------------------+
-                                              |
-                     +------------------------+------------------------+
-                     |                        |                        |
-                     v                        v                        v
-         +-----------------------+ +--------------------+ +-----------------------+
-         |    DOCUMENT AGENT     | |    VISION AGENT    | | HISTORICAL PATTERN    |
-         | - Schema Validation   | | - Damage Detect    | | - Frequency Spikes    |
-         | - Invoices/Estimates  | | - Severity Grade   | | - Repeat Bad Shops    |
-         | - Police Reports      | | - Angle Consistency| | - Repair Benchmarks   |
-         +-----------+-----------+ +----------+---------+ +-----------+-----------+
-                     |                        |                       |
-                     +------------------------+-----------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |               DETERMINISTIC RULES ENGINE              |
-                  |   (Duplicate Invoices, Date Violations, Parts Math)   |
-                  +---------------------------+---------------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |                   VERIFICATION AGENT                  |
-                  |  (Cross-Checks Claim vs. Police, Photo vs. Estimate)  |
-                  +---------------------------+---------------------------+
-                                              |
-                                              v
-                  +-------------------------------------------------------+
-                  |                   FRAUD RISK ENGINE                   |
-                  |     (Composite 0-100 Score, Configurable Bands)       |
-                  +---------------------------+---------------------------+
-                                              |
-                             +----------------+----------------+
-                             |                                 |
-                 Risk <= 60 (LOW/MEDIUM)             Risk > 60 (HIGH/CRITICAL)
-                             |                                 |
-                             v                                 v
-                  [ Standard Processing ]             [ Auto-Spawn SIU Case ]
-                                                               |
-                                                               v
-                                                    [ Human Investigator UI ]
-                                                    (Override, Notes, Decide)
-                                                               |
-                                                               v
-                                                    [ Claims Management API ]
-```
+
+### 2.1 The 13-Node Pipeline:
+1. **`load_claim`**: Ingests claim metadata and verifies coverage parameters.
+2. **`collect_evidence`**: Ingests and normalizes uploaded and inline documents, repair estimates, and photographs.
+3. **`document_analysis`** *(Parallel Branch)*: Structured LLM extraction of parts, labor hours, and damage descriptions.
+4. **`vision_analysis`** *(Parallel Branch)*: Damage severity grading and perceptual hash (pHash) duplication screening.
+5. **`historical_analysis`** *(Parallel Branch)*: Repair shop collusion screening and claimant velocity modeling.
+6. **`rules_analysis`** *(Fan-In Join)*: Executes deterministic mathematical and logical constraints.
+7. **`verification`**: Reconciles evidence across sources (police report vs. claim vs. repair estimate).
+8. **`llm_investigation_synthesis`**: Synthesizes an executive narrative, flags uncorroborated assertions, and generates investigator checklists.
+9. **`risk_calculation`**: **Authoritative 0â€“100 risk scoring**. Calculated strictly by the deterministic risk engine.
+10. **`risk_routing`**: Triages into fast-track settlement (Low/Medium) vs. SIU referral (High/Critical).
+11. **`human_review`**: Mandatory investigator sign-off and risk override review.
+12. **`audit`**: Writes immutable, tamper-evident audit logs.
+13. **`claims_sync`**: Dispatches sync updates to core claims systems (Guidewire / Duck Creek mock adapter).
 
 ---
 
-## 3. Key Modules & Independent AI Agents
+## 3. LLM Layer & Security Guardrails
 
-1. **Document Processing Agent (`app/agents/document_agent.py`)**:
-   - Parses Claim Forms, Repair Estimates, Invoices, and Police Reports.
-   - Converts unstructured text into strictly validated Pydantic models.
-   - Features active protection against indirect prompt injection embedded in receipts.
+### 3.1 Pluggable LLM Providers
+Configurable via environment variables with three modes:
+- **`mock` (Default)**: Zero external API keys required. Uses local deterministic extraction and synthesis tagged with `[LOCAL DEMO / MOCK]`.
+- **`gemini`**: Direct integration with Google Gemini (`gemini-1.5-pro` / `gemini-1.5-flash`).
+- **`openrouter`**: Multi-model routing (GPT-4o, Claude 3.5 Sonnet).
 
-2. **Vision / Image Analysis Agent (`app/agents/vision_agent.py`)**:
-   - Inspects crash and damage photography.
-   - Identifies damaged panels (bumper, fender, hood, quarter panel, windshield).
-   - Flags "ghost repairs" where estimates bill for components untouched in crash photos.
-
-3. **Historical Pattern Agent (`app/agents/historical_agent.py`)**:
-   - Evaluates policyholder claim velocity against regional averages (spikes in rolling 24mo).
-   - Checks repair shops against SIU collusion watchlists.
-   - Identifies recycled invoice numbers previously settled in historical claims.
-
-4. **Deterministic Rules Engine (`app/agents/rules_engine.py`)**:
-   - Applies strict logic constraints without statistical variance:
-     - `R01`: Claim amount > 85% vehicle fair market value without total loss.
-     - `R02`: Suspicious round number totals ($5,000.00 or $10,000.00).
-     - `R03`: Duplicate line items within repair estimates.
-     - `R04`: Excessive labor-to-parts ratio (> 2.0x).
-     - `R05`: Direct date contradiction between claim and police report.
-
-5. **Evidence Verification Agent (`app/agents/verification_agent.py`)**:
-   - Cross-reconciles evidence sources: Claim vs. Police Report, Photo vs. Estimate, Invoice vs. Estimate, and Vehicle VIN consistency.
-
-6. **Fraud Risk Engine (`app/agents/risk_engine.py`)**:
-   - Composite scoring normalized to 0–100:
-     - `0–30`: LOW (Fast-track automated payment)
-     - `31–60`: MEDIUM (Standard adjuster review)
-     - `61–80`: HIGH (Mandatory SIU referral)
-     - `81–100`: CRITICAL (Immediate freeze & forensic audit)
-   - Generates natural-language explainability citing specific evidence tokens (`DOC-001`, `IMG-002`).
-
-7. **Human-in-the-Loop & Investigator Dashboard**:
-   - Full React + Vite + Tailwind interface.
-   - Complete dossier viewer, cross-evidence conflict matrix, and immutable audit trail.
-   - Human decision console supporting overrides with mandatory rationale.
-
-8. **Claims Management API (`app/api/v1/external_claims.py`)**:
-   - RESTful adapters for external core claims platforms (Guidewire ClaimCenter / Duck Creek).
+### 3.2 Indirect Prompt Injection Defense (`RULE SEC-01`)
+All submitted unstructured evidence (invoices, OCR transcriptions, damage descriptions) is treated as **untrusted data**:
+- Strips system delimiter tokens (`system:`, `instruction:`, `ignore previous directives`).
+- Fences content inside `<untrusted_document_data>` tags.
+- LLMs are strictly prohibited from modifying scores or altering execution rules.
 
 ---
 
 ## 4. Technology Stack
 
-- **Backend**: Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async), SQLite / Azure SQL, Uvicorn.
+- **Orchestration**: LangGraph 1.2+, LangChain Core.
+- **Backend**: Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async), SQLite / Azure SQL, WebSockets, Uvicorn.
+- **LLM Reasoning**: Google Gemini API, OpenRouter, and Local Mock Provider.
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide React, Axios.
-- **Testing**: Pytest, Pytest-Asyncio, HTTPX.
-- **Cloud Architecture**: Azure Container Apps, Azure Static Web Apps, Azure Blob Storage, Azure AI Document Intelligence, Azure OpenAI, Azure Key Vault.
+- **Testing**: Pytest, Pytest-Asyncio, HTTPX (32/32 tests passing).
 
 ---
 
-## 5. Folder Structure
+## 5. API Reference
 
-```
-ai-fraud-detection-agent/
-+-- backend/
-¦   +-- app/
-¦   ¦   +-- agents/            # Document, Vision, Historical, Rules, Verification, Risk
-¦   ¦   +-- api/v1/            # Claims, Investigation, External Claims, Health
-¦   ¦   +-- core/              # Configuration & settings
-¦   ¦   +-- db/                # Models & session management
-¦   ¦   +-- schemas/           # Pydantic v2 schemas
-¦   ¦   +-- services/          # Audit logging
-¦   ¦   +-- main.py            # FastAPI entrypoint & SPA hosting
-¦   +-- scripts/
-¦   ¦   +-- seed_demo_data.py  # Seeder for historical benchmarks & Scenarios A-F
-¦   +-- tests/                 # Unit, integration, and E2E test suite
-¦   +-- uploads/               # Evidence file storage
-¦   +-- pyproject.toml         # Python dependencies
-+-- frontend/
-¦   +-- src/
-¦   ¦   +-- components/        # Navbar, Metrics, Queue, Detail View, Intake Modal
-¦   ¦   +-- services/          # Axios API client
-¦   ¦   +-- types.ts           # TypeScript interfaces
-¦   ¦   +-- App.tsx            # Main application layout
-¦   ¦   +-- main.tsx           # React entrypoint
-¦   +-- package.json
-¦   +-- tailwind.config.js
-¦   +-- vite.config.ts
-+-- docs/
-¦   +-- CURRENT_STATE.md
-¦   +-- IMPLEMENTATION_PLAN.md
-¦   +-- AZURE_ARCHITECTURE.md
-¦   +-- SECURITY.md
-+-- README.md
-```
+### Real-Time Claims & Investigation Endpoints:
+- `POST /api/v1/claims` - Intake claim with inline documents/photos + auto LangGraph execution.
+- `GET /api/v1/claims/{claim_id}` - Retrieve complete claim dossier, evidence, and risk assessments.
+- `GET /api/v1/claims/{claim_id}/investigation` - Retrieve LangGraph execution state, signals, and LLM synthesis.
+- `POST /api/v1/investigations/trigger/{claim_id}` - Trigger real-time LangGraph multi-agent pipeline.
+- `GET /api/v1/investigations/{investigation_id}/status` - Real-time pipeline status and node progress polling.
+- `WS /api/v1/investigations/{investigation_id}/stream` - Real-time WebSocket streaming of node events.
+- `POST /api/v1/investigations/claim/{claim_id}/override` - Licensed investigator risk score override (requires rationale).
+- `POST /api/v1/investigations/claim/{claim_id}/final-decision` - Human binding decision (Approve / Deny / Refer to SIU).
 
 ---
 
 ## 6. Local Setup & Quick Start
 
 ### Prerequisites
-- Python 3.11+ (or `uv` package manager)
+- Python 3.11+
 - Node.js v18+ with `npm`
 
 ### Step 1: Backend Setup
@@ -190,69 +123,68 @@ cd ai-fraud-detection-agent/backend
 uv venv
 uv pip install -e .
 
-# Seed benchmark database and 6 test scenarios
+# Seed benchmark database and test scenarios
 uv run python -m scripts.seed_demo_data
 
-# Start FastAPI backend server
-uv run uvicorn app.main:app --port 8000
+# Start FastAPI backend server (runs on port 8000)
+uv run uvicorn app.main:app --port 8000 --reload
 ```
-API Documentation will be available at `http://localhost:8000/docs`.
+Interactive OpenAPI documentation is available at `http://localhost:8000/docs`.
 
 ### Step 2: Frontend Setup
 ```powershell
 cd ai-fraud-detection-agent/frontend
 
-# Install dependencies
+# Install dependencies and build bundle
 npm.cmd install
-
-# Build production assets
 npm.cmd run build
 
-# Start Vite dev server (or open http://localhost:8000 directly!)
+# Start Vite development server
 npm.cmd run dev
 ```
-Open `http://localhost:5173` (Vite dev) or `http://localhost:8000` (FastAPI hosted SPA).
+Open `http://localhost:5173` (or `http://localhost:8000` for FastAPI-hosted SPA).
 
 ---
 
 ## 7. Running Automated Tests
 
-Run the complete 20-test test suite:
+Run the complete 32-test test suite:
 ```powershell
 cd ai-fraud-detection-agent/backend
 uv run pytest -v
 ```
 
-### Test Coverage Breakdown:
-| Test Module | Focus Area | Result |
-|:---|:---|:---|
-| `test_rules_engine.py` | Excessive claim ratio, round numbers, duplicate estimate items, date contradictions | PASS |
-| `test_risk_engine.py` | Clean claim baseline, composite scoring, cap at 100, explainability narrative | PASS |
-| `test_document_agent.py` | Pydantic schema validation, indirect prompt injection detection & redaction | PASS |
-| `test_verification_agent.py` | Date conflict claim vs. police, VIN mismatch claim vs. estimate | PASS |
-| `test_claims_api.py` | Claim creation, multi-part evidence upload, SHA-256 calculation, audit logging | PASS |
-| `test_investigation_api.py` | Investigator notes, human score override, final determination submission | PASS |
-| `test_e2e_scenarios.py` | Full E2E validation of Scenarios A through F | PASS |
+### Test Coverage Summary:
+| Test Suite | Focus Area | Tests | Status |
+|:---|:---|:---:|:---:|
+| `test_langgraph_llm.py` | LangGraph DAG, state transitions, LLM synthesis, SEC-01 injection defense, real-time APIs, Scenarios Aâ€“F | 12 | PASS |
+| `test_rules_engine.py` | Excessive claim ratio, round numbers, duplicate estimate items, date contradictions | 4 | PASS |
+| `test_risk_engine.py` | Baseline scoring, composite calculation, 0â€“100 bounding, explainability generation | 4 | PASS |
+| `test_document_agent.py` | Pydantic schema validation, prompt injection redaction | 2 | PASS |
+| `test_verification_agent.py` | Date contradiction, VIN mismatch cross-validation | 2 | PASS |
+| `test_claims_api.py` | Intake, multipart evidence upload, SHA-256 fingerprinting | 2 | PASS |
+| `test_investigation_api.py` | Investigator notes, human score override, final determination submission | 3 | PASS |
+| `test_e2e_scenarios.py` | End-to-end multi-agent verification across all benchmark scenarios | 3 | PASS |
+| **Total** | | **32** | **100% PASS** |
 
 ---
 
-## 8. End-to-End Scenarios
+## 8. Benchmark Scenarios Aâ€“F
 
-The test seeder (`scripts/seed_demo_data.py`) provisions 6 target test cases:
-
-- **Scenario A (`CLM-SCENARIO-A`) — Legitimate Claim (LOW Risk, 5/100)**: Clean match, minor bumper scuff, matching invoice/estimate, fast-tracked.
-- **Scenario B (`CLM-SCENARIO-B`) — Suspicious Claim (CRITICAL Risk, 85/100)**: Excessive repair claim (98.6% of vehicle value), excessive labor ratio, billed by watchlisted shop ("QuickCash Collision").
-- **Scenario C (`CLM-SCENARIO-C`) — Document Inconsistency (HIGH Risk, 70/100)**: Claim form dates accident on Aug 12; official Police Report records event on Aug 28 (16 days later!).
-- **Scenario D (`CLM-SCENARIO-D`) — Estimate / Photo Mismatch (HIGH Risk, 70/100)**: Photos show minor cosmetic rear door dent ($400-$900); repair estimate charges \$8,750 for front bumper, hood, and radiator rebuild.
-- **Scenario E (`CLM-SCENARIO-E`) — Recycled Duplicate Invoice (HIGH Risk, 70/100)**: Submitted invoice (`INV-RECYCLED-9901`) was already paid 8 months earlier under historical claim `HIST-003`.
-- **Scenario F (`CLM-SCENARIO-F`) — Historical Velocity Spike (HIGH Risk, 65/100)**: Claimant filed 4 collision claims in rolling 24 months, significantly exceeding regional baselines.
+| Scenario | Title | Description | Expected Score | Outcome |
+|:---:|:---|:---|:---:|:---|
+| **A** | Clean Commuter | Minor fender-bender, valid police report, matching estimate | 12.0 (LOW) | Fast-Track Settlement |
+| **B** | Staged Collision | Inflated repair (98% of car value), watchlisted collision shop | 85.0 (CRITICAL) | Priority SIU Referral |
+| **C** | Recycled Photo | Same damage photo used across multiple unrelated claims | 65.0 (HIGH) | Perceptual Hash Match Flagged |
+| **D** | Ghost Passenger | Passenger claiming bodily injury not listed in police report | 60.0 (HIGH) | Cross-Document Contradiction |
+| **E** | VIN Mismatch | Total loss claim where frame VIN does not match vehicle registration | 92.0 (CRITICAL) | Stolen Vehicle / Salvage Fraud |
+| **F** | Prompt Injection | Malicious invoice containing indirect prompt injection instructions | 75.0 (CRITICAL) | Defended by RULE SEC-01 |
 
 ---
 
-## 9. Security & Azure Readiness
+## 9. Regulatory Compliance & Documentation
 
-- **Zero Hardcoded Credentials**: Environment variables managed via Pydantic Settings.
-- **Prompt Injection Defense**: Untrusted documents sanitized with regex defenses and isolated from system prompt contexts.
-- **SHA-256 Immutability**: Every uploaded evidence file is cryptographically fingerprinted.
-- **Azure Enterprise Ready**: Documented blueprint for Azure Container Apps, Azure Blob Storage (WORM), Azure AI Document Intelligence, Azure OpenAI, and Azure SQL in `docs/AZURE_ARCHITECTURE.md`.
-- **Security Blueprint**: Detailed in `docs/SECURITY.md`.
+- Comprehensive Architecture Guide: [`docs/LANGGRAPH_LLM_ARCHITECTURE.md`](docs/LANGGRAPH_LLM_ARCHITECTURE.md)
+- Azure Enterprise Deployment Blueprint: [`docs/AZURE_ARCHITECTURE.md`](docs/AZURE_ARCHITECTURE.md)
+- Threat Model & Security Posture: [`docs/SECURITY.md`](docs/SECURITY.md)
+- Interactive Demonstration Guide: [`docs/DEMO_GUIDE.md`](docs/DEMO_GUIDE.md)

@@ -139,3 +139,47 @@ export interface SystemHealth {
     average_risk_score: number;
   };
 }
+
+export interface StageEntry {
+  stage: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  timestamp: string;
+  node?: string;
+  detail?: string;
+}
+
+export interface InvestigationSynthesis {
+  summary: string;
+  discrepancies: string[];
+  key_inconsistencies?: string[];
+  corroborated_facts?: string[];
+  unverified_assertions?: string[];
+  investigator_checklist?: string[];
+  recommended_focus?: string;
+  provider?: string;
+}
+
+export interface InvestigationStatus {
+  investigation_id: string;
+  claim_id: string;
+  current_stage: string;
+  status: "in_progress" | "completed" | "error" | "pending";
+  stage_history: StageEntry[];
+  agent_statuses: Record<string, string>;
+  fraud_signals: FraudSignal[];
+  risk_score?: number;
+  risk_level?: string;
+  llm_provider?: string;
+  llm_extractions?: Array<{
+    document_type?: string;
+    provider?: string;
+    confidence?: number;
+    extracted_fields?: Record<string, any>;
+    raw_summary?: string;
+    injection_flag?: boolean;
+    anomalies?: string[];
+  }>;
+  investigation_synthesis?: InvestigationSynthesis;
+  error?: string | null;
+}
+

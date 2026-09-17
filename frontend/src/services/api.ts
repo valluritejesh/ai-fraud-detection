@@ -74,6 +74,28 @@ export const investigationApi = {
     });
     return res.data;
   },
+
+  getInvestigationStatus: async (investigationId: string) => {
+    const res = await api.get(`/investigations/${investigationId}/status`);
+    return res.data;
+  },
+
+  getClaimInvestigation: async (claimId: string) => {
+    const res = await api.get(`/claims/${claimId}/investigation`);
+    return res.data;
+  },
+
+  triggerInvestigation: async (claimId: string) => {
+    const res = await api.post(`/investigations/trigger/${claimId}`);
+    return res.data;
+  },
+
+  getStreamUrl: (investigationId: string) => {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // If running on vite port 5173 or direct 8000, construct proper websocket endpoint
+    const host = window.location.host;
+    return `${proto}//${host}/api/v1/investigations/${investigationId}/stream`;
+  },
 };
 
 export const healthApi = {

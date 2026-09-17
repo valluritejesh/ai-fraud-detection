@@ -12,7 +12,8 @@ import {
   FileSpreadsheet,
   Sliders,
   Sparkles,
-  Award
+  Award,
+  GitGraph
 } from "lucide-react";
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "realtime", label: "Live LangGraph", icon: GitGraph, pulse: true },
     { id: "new_claim", label: "Submit Claim", icon: PlusCircle, isAction: true },
     { id: "queue", label: "Claims Queue", icon: ListFilter, badge: claimCount },
     { id: "investigations", label: "Investigations", icon: Scale, badge: investigationCount },

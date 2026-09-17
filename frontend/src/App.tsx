@@ -14,6 +14,7 @@ import { EvidenceLibraryView } from "./components/EvidenceLibraryView";
 import { AuditTrailView } from "./components/AuditTrailView";
 import { ReportsView } from "./components/ReportsView";
 import { SettingsView } from "./components/SettingsView";
+import { RealtimeInvestigationView } from "./components/RealtimeInvestigationView";
 import { claimsApi } from "./services/api";
 import { Claim, ClaimDetail } from "./types";
 
@@ -172,6 +173,12 @@ export const App: React.FC = () => {
                 if (selectedClaimId) fetchClaimDetail(selectedClaimId);
                 fetchClaims();
               }}
+            />
+          ) : currentTab === "realtime" ? (
+            <RealtimeInvestigationView
+              claims={claims}
+              onOpenClaimDossier={fetchClaimDetail}
+              defaultClaimId={previewScenarioId}
             />
           ) : currentTab === "health" ? (
             <SystemHealthView />

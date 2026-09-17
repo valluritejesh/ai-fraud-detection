@@ -38,5 +38,12 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONNECTION_STRING: str = ""
     AZURE_STORAGE_CONTAINER: str = "evidence-files"
 
+    # LLM Service Configuration (Gemini, OpenRouter, or Local Mock)
+    LLM_PROVIDER: str = "mock"  # "gemini", "openrouter", "mock"
+    LLM_MODEL: str = "gemini-2.5-flash"
+    LLM_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+
 settings = Settings()
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

@@ -20,13 +20,17 @@ from app.orchestration.fraud_graph import (
     execute_langgraph_investigation
 )
 from app.services.audit_service import log_audit_event
+from app.core.auth import InvestigatorUser, get_current_investigator, authenticate_websocket
 
 router = APIRouter()
 
 # --- 1. Real-Time Status & WebSocket Streaming ---
 
 @router.get("/{investigation_id}/status", response_model=InvestigationStatusResponse)
-async def get_investigation_status(investigation_id: str):
+async def get_investigation_status(
+    investigation_id: str,
+    current_user: InvestigatorUser = Depends(get_current_investigator)
+):
     """
     Polls real-time investigation progress, stages, and findings from LangGraph execution.
     """
@@ -59,10 +63,17 @@ async def get_investigation_status(investigation_id: str):
     )
 
 @router.websocket("/{investigation_id}/stream")
-async def stream_investigation_websocket(websocket: WebSocket, investigation_id: str):
+async def stream_investigation_websocket(
+    websocket: WebSocket,
+    investigation_id: str,
+    token: Optional[str] = Query(None)
+):
     """
     WebSocket endpoint streaming live LangGraph stage transitions and agent findings.
     """
+    user = await authenticate_websocket(websocket, token)
+    if not user:
+        return
     await websocket.accept()
     try:
         async for state_update in investigation_registry.subscribe(investigation_id):
@@ -107,7 +118,11 @@ async def stream_investigation_websocket(websocket: WebSocket, investigation_id:
             pass
 
 @router.post("/trigger/{claim_id}", response_model=InvestigationStatusResponse)
-async def trigger_investigation(claim_id: str, db: AsyncSession = Depends(get_db)):
+async def trigger_investigation(
+    claim_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
+):
     """
     On-demand launcher for triggering a LangGraph investigation on an existing claim.
     """
@@ -116,7 +131,7 @@ async def trigger_investigation(claim_id: str, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=404, detail="Claim not found")
 
     res = await execute_langgraph_investigation(claim_id)
-    return await get_investigation_status(res["investigation_id"])
+    return await get_investigation_status(res["investigation_id"], current_user=current_user)
 
 # --- 2. Existing Investigation Case & Governance Routes ---
 
@@ -125,7 +140,8 @@ async def list_investigations(
     status: Optional[str] = Query(None),
     priority: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     stmt = select(InvestigationCase).order_by(desc(InvestigationCase.created_at)).limit(limit)
     if status:
@@ -138,7 +154,8 @@ async def list_investigations(
 @router.get("/claim/{claim_id}", response_model=InvestigationCaseResponse)
 async def get_claim_investigation_case(
     claim_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     stmt = select(InvestigationCase).where(InvestigationCase.claim_id == claim_id)
     res = await db.execute(stmt)
@@ -151,7 +168,8 @@ async def get_claim_investigation_case(
 async def add_investigation_note(
     claim_id: str,
     payload: InvestigationNoteCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     stmt = select(InvestigationCase).where(InvestigationCase.claim_id == claim_id)
     res = await db.execute(stmt)
@@ -181,7 +199,8 @@ async def add_investigation_note(
 async def override_ai_risk(
     claim_id: str,
     payload: InvestigationOverrideRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     stmt = select(InvestigationCase).where(InvestigationCase.claim_id == claim_id)
     res = await db.execute(stmt)
@@ -207,7 +226,7 @@ async def override_ai_risk(
     old_level = claim.risk_level
 
     reason = getattr(payload, "override_reason", None) or getattr(payload, "reason", "")
-    investigator = getattr(payload, "investigator", None) or getattr(payload, "investigator_id", "SIU Lead Vance")
+    investigator = getattr(payload, "investigator", None) or getattr(payload, "investigator_id", None) or current_user.name
 
     case.ai_risk_overridden = True
     case.override_score = new_score
@@ -242,7 +261,8 @@ async def override_ai_risk(
 async def record_final_decision(
     claim_id: str,
     payload: FinalDecisionRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     stmt = select(InvestigationCase).where(InvestigationCase.claim_id == claim_id)
     res = await db.execute(stmt)
@@ -255,7 +275,7 @@ async def record_final_decision(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     reason = getattr(payload, "reason", None) or getattr(payload, "rationale", "")
-    decided_by = getattr(payload, "decided_by", None) or getattr(payload, "investigator_id", "Chief Adjuster Vance")
+    decided_by = getattr(payload, "decided_by", None) or getattr(payload, "investigator_id", None) or current_user.name
 
     case.final_determination = payload.decision
     case.final_decision = payload.decision

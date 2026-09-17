@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.db.models import Claim, InvestigationCase
+from app.core.auth import InvestigatorUser, get_current_investigator
 
 router = APIRouter()
 
@@ -26,7 +27,8 @@ class ExternalSyncResponse(BaseModel):
 async def sync_claim_to_external_system(
     claim_id: str,
     payload: ExternalSyncRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     """
     Mock integration adapter for external core claims systems (Guidewire / Duck Creek).
@@ -52,7 +54,8 @@ async def sync_claim_to_external_system(
 @router.get("/status/{claim_id}")
 async def get_external_claim_status(
     claim_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     claim = await db.get(Claim, claim_id)
     if not claim:

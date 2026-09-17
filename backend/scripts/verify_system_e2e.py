@@ -21,7 +21,7 @@ async def verify_e2e():
         print("[PASS] Root endpoint successfully serves compiled React SPA index.html")
 
         print("\n=== 3. Testing Claims Queue & Filtering ===")
-        res = await client.get("/api/v1/claims")
+        res = await client.get("/api/v1/claims?limit=200")
         assert res.status_code == 200
         claims = res.json()
         assert len(claims) >= 6, f"Expected at least 6 claims, got {len(claims)}"

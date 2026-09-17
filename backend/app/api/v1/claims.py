@@ -22,6 +22,8 @@ from app.schemas.evidence import EvidenceResponse
 from app.schemas.fraud import FraudSignalResponse, RiskAssessmentResponse, AuditLogResponse
 from app.orchestration.fraud_graph import execute_langgraph_investigation, investigation_registry
 from app.services.audit_service import log_audit_event
+from app.services.storage import get_storage_service
+from app.core.auth import InvestigatorUser, get_current_investigator
 
 router = APIRouter()
 
@@ -78,14 +80,11 @@ async def create_claim(
     if payload.evidence:
         all_inline.extend(payload.evidence)
 
-    claim_upload_dir = settings.UPLOAD_DIR / claim_id
-    claim_upload_dir.mkdir(parents=True, exist_ok=True)
-
+    storage = get_storage_service()
     evidence_records = []
     for item in all_inline:
         ev_id = f"EVD-{uuid.uuid4().hex[:8].upper()}"
         fname = item.filename or f"{item.document_type}_{ev_id}.txt"
-        saved_path = claim_upload_dir / f"{ev_id}_{fname}"
         
         file_bytes = b""
         if item.content_json is not None:
@@ -98,17 +97,23 @@ async def create_claim(
         else:
             file_bytes = f"Document type: {item.document_type}".encode("utf-8")
 
-        saved_path.write_bytes(file_bytes)
-        sha256_h = hashlib.sha256(file_bytes).hexdigest()
+        mtype = "application/json" if item.content_json else "text/plain"
+        stored_path, sha256_h, fsize = await storage.save_evidence(
+            file_bytes=file_bytes,
+            filename=f"{ev_id}_{fname}",
+            claim_id=claim.id,
+            content_type=mtype,
+            metadata={"document_type": item.document_type, "evidence_id": ev_id}
+        )
 
         ev = Evidence(
             id=ev_id,
             claim_id=claim.id,
             filename=fname,
-            stored_path=str(saved_path),
-            mime_type="application/json" if item.content_json else "text/plain",
+            stored_path=stored_path,
+            mime_type=mtype,
             document_type=item.document_type,
-            file_size_bytes=len(file_bytes),
+            file_size_bytes=fsize,
             sha256_hash=sha256_h,
             extraction_status="PENDING",
             extracted_data={},
@@ -328,34 +333,30 @@ async def upload_evidence(
             detail=f"File extension {ext} not permitted. Allowed: {settings.ALLOWED_EXTENSIONS}"
         )
 
-    claim_upload_dir = settings.UPLOAD_DIR / claim_id
-    claim_upload_dir.mkdir(parents=True, exist_ok=True)
     evidence_id = f"EVD-{uuid.uuid4().hex[:8].upper()}"
-    saved_path = claim_upload_dir / f"{evidence_id}_{filename}"
+    file_bytes = await file.read()
+    if len(file_bytes) > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum allowed size ({settings.MAX_UPLOAD_SIZE_MB}MB)"
+        )
 
-    sha256 = hashlib.sha256()
-    size_bytes = 0
-
-    with open(saved_path, "wb") as f:
-        while chunk := await file.read(1024 * 1024):
-            size_bytes += len(chunk)
-            if size_bytes > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
-                saved_path.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"File exceeds maximum allowed size ({settings.MAX_UPLOAD_SIZE_MB}MB)"
-                )
-            sha256.update(chunk)
-            f.write(chunk)
-
-    file_hash = sha256.hexdigest()
+    storage = get_storage_service()
+    content_type = file.content_type or "application/octet-stream"
+    stored_path, file_hash, size_bytes = await storage.save_evidence(
+        file_bytes=file_bytes,
+        filename=f"{evidence_id}_{filename}",
+        claim_id=claim.id,
+        content_type=content_type,
+        metadata={"document_type": document_type, "evidence_id": evidence_id}
+    )
 
     evidence = Evidence(
         id=evidence_id,
         claim_id=claim.id,
         filename=filename,
-        stored_path=str(saved_path),
-        mime_type=file.content_type or "application/octet-stream",
+        stored_path=stored_path,
+        mime_type=content_type,
         document_type=document_type,
         file_size_bytes=size_bytes,
         sha256_hash=file_hash,
@@ -419,7 +420,8 @@ async def get_claim_signals(
 @router.get("/{claim_id}/audit-trail", response_model=List[AuditLogResponse])
 async def get_claim_audit_trail(
     claim_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: InvestigatorUser = Depends(get_current_investigator)
 ):
     stmt = (
         select(AuditLog)

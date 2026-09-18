@@ -9,6 +9,8 @@ from app.core.config import settings
 from app.llm.client import (
     get_llm_client,
     AzureOpenAILLMClient,
+    OpenRouterLLMClient,
+    GeminiLLMClient,
     LocalMockLLMClient,
     BaseLLMClient,
     sanitize_untrusted_text,
@@ -138,6 +140,7 @@ async def test_multimodal_request_construction():
     req = captured_requests[0]
     assert "https://fraudguard-openai-202609.openai.azure.com/openai/deployments/fraudguard-gpt56/chat/completions?api-version=2024-10-21" == req["url"]
     assert req["headers"]["api-key"] == "test-key-abc"
+    assert "temperature" not in req["json"], "Azure OpenAI requests must omit temperature to allow GPT-5.6-Sol model default"
 
     messages = req["json"]["messages"]
     user_msg = next(m for m in messages if m["role"] == "user")
@@ -428,3 +431,183 @@ async def test_all_six_benchmark_scenarios():
             assert res["assigned_investigator"] == "SIU Senior Investigator"
         else:
             assert res["assigned_investigator"] == "Automated STP"
+
+# 12. Verification that all Azure OpenAI requests omit temperature
+@pytest.mark.asyncio
+async def test_azure_openai_all_requests_omit_temperature():
+    client = AzureOpenAILLMClient(
+        endpoint="https://fraudguard-openai-202609.openai.azure.com",
+        api_key="test-key-xyz",
+        deployment="fraudguard-gpt56",
+        api_version="2024-10-21"
+    )
+
+    captured_requests = []
+
+    def make_mock_response(content_dict):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "choices": [{"message": {"content": json.dumps(content_dict)}}]
+        }
+        return resp
+
+    async def mock_post(url, headers=None, json=None):
+        captured_requests.append({"url": str(url), "headers": headers, "json": json})
+        req_type = "generic"
+        messages = json.get("messages", [])
+        sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
+        if "Document Understanding" in sys_msg:
+            return make_mock_response({
+                "document_type": "invoice",
+                "summary": "Verified repair invoice",
+                "key_entities": {},
+                "line_items": [],
+                "anomalies_detected": [],
+                "suspicious_indicators": [],
+                "confidence": 0.95,
+                "prompt_injection_warning": False
+            })
+        elif "Evidence Correlation" in sys_msg:
+            return make_mock_response({
+                "cross_evidence_discrepancies": [],
+                "timeline_consistency": "CONSISTENT",
+                "severity_vs_reported_damage": "ALIGNED",
+                "suspicious_correlations": [],
+                "confidence_score": 0.95
+            })
+        elif "Senior SIU Investigation" in sys_msg:
+            return make_mock_response({
+                "executive_summary": "Synthesized Azure OpenAI briefing",
+                "key_risk_drivers": [],
+                "evidence_synthesis": "Evidence layers align",
+                "investigative_recommendations": ["STP"],
+                "requires_special_investigation": False,
+                "confidence_assessment": 0.95
+            })
+        else:
+            return make_mock_response({
+                "document_type": "damage_photo",
+                "vehicle_detected": True,
+                "findings": [],
+                "overall_visual_damage_severity": "minor",
+                "estimated_visual_repair_cost_range": {"min": 100, "max": 200},
+                "confidence": 0.90
+            })
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_post):
+        # 1. Document analysis
+        await client.analyze_document(
+            document_text="Repair invoice: $1,200",
+            document_type="invoice",
+            claim_meta={"id": "CLM-T1", "claimed_amount": 1200.0}
+        )
+
+        # 2. Evidence correlation
+        await client.correlate_evidence(
+            claim_id="CLM-T1",
+            incident_date="2026-08-01",
+            claimed_amount=1200.0,
+            evidence_summary="All documents consistent"
+        )
+
+        # 3. Investigation synthesis
+        await client.synthesize_investigation(
+            claim_data={"id": "CLM-T1", "claimed_amount": 1200.0},
+            rule_signals=[],
+            historical_signals=[],
+            verification_signals=[],
+            document_insights={},
+            vision_insights=[],
+            prompt_injected=False,
+            deterministic_risk_score=10.0,
+            deterministic_risk_level="LOW",
+            requires_human_review=False
+        )
+
+        # 4. Multimodal vision analysis
+        await client.analyze_image(
+            image_bytes=b"\xff\xd8fakeimagebytes",
+            mime_type="image/jpeg",
+            claim_meta={"id": "CLM-T1", "claimed_amount": 1200.0}
+        )
+
+    assert len(captured_requests) == 4
+    for i, req in enumerate(captured_requests):
+        payload = req["json"]
+        assert "temperature" not in payload, f"Request {i} must NOT contain 'temperature', got: {payload.get('temperature')}"
+        assert payload.get("response_format") == {"type": "json_object"}
+        assert "messages" in payload
+        assert req["headers"]["api-key"] == "test-key-xyz"
+        assert req["url"].startswith("https://fraudguard-openai-202609.openai.azure.com/openai/deployments/fraudguard-gpt56/chat/completions")
+
+# 13. Verification that other providers (Gemini, OpenRouter) retain explicit temperature
+@pytest.mark.asyncio
+async def test_other_providers_retain_explicit_temperature():
+    # OpenRouter
+    openrouter_client = OpenRouterLLMClient(api_key="sk-or-test", model="openai/gpt-4o-mini")
+    captured_openrouter = []
+
+    async def mock_or_post(url, headers=None, json=None):
+        captured_openrouter.append(json)
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "choices": [{"message": {"content": json.dumps({
+                "document_type": "invoice",
+                "summary": "OpenRouter test",
+                "key_entities": {},
+                "line_items": [],
+                "anomalies_detected": [],
+                "suspicious_indicators": [],
+                "confidence": 0.9,
+                "prompt_injection_warning": False
+            })}}]
+        }
+        return resp
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_or_post):
+        await openrouter_client.analyze_document(
+            document_text="Repair invoice: $500",
+            document_type="invoice",
+            claim_meta={"id": "CLM-OR", "claimed_amount": 500.0}
+        )
+
+    assert len(captured_openrouter) == 1
+    assert captured_openrouter[0]["temperature"] == 0.1, "OpenRouter must retain temperature=0.1"
+
+    # Gemini
+    gemini_client = GeminiLLMClient(api_key="gemini-test-key", model="gemini-2.5-flash")
+    captured_gemini = []
+
+    async def mock_gemini_post(url, headers=None, json=None):
+        captured_gemini.append(json)
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "candidates": [{
+                "content": {
+                    "parts": [{"text": json.dumps({
+                        "document_type": "invoice",
+                        "summary": "Gemini test",
+                        "key_entities": {},
+                        "line_items": [],
+                        "anomalies_detected": [],
+                        "suspicious_indicators": [],
+                        "confidence": 0.9,
+                        "prompt_injection_warning": False
+                    })}]
+                }
+            }]
+        }
+        return resp
+
+    with patch("httpx.AsyncClient.post", side_effect=mock_gemini_post):
+        await gemini_client.analyze_document(
+            document_text="Repair invoice: $500",
+            document_type="invoice",
+            claim_meta={"id": "CLM-GEMINI", "claimed_amount": 500.0}
+        )
+
+    assert len(captured_gemini) == 1
+    assert captured_gemini[0]["generationConfig"]["temperature"] == 0.1, "Gemini must retain temperature=0.1"

@@ -773,8 +773,7 @@ class AzureOpenAILLMClient(BaseLLMClient):
         ]
 
         payload: Dict[str, Any] = {
-            "messages": messages,
-            "temperature": 0.1
+            "messages": messages
         }
         if json_response:
             payload["response_format"] = {"type": "json_object"}

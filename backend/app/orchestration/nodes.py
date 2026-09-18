@@ -2,7 +2,7 @@ import uuid
 import time
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from sqlalchemy import select
 
@@ -17,12 +17,39 @@ from app.agents.rules_engine import rules_engine
 from app.agents.verification_agent import verification_agent
 from app.agents.risk_engine import risk_engine
 from app.llm.client import get_llm_client, sanitize_untrusted_text
+from app.services.storage import get_storage_service, temporary_evidence_file
 from app.services.audit_service import log_audit_event
 
 logger = logging.getLogger("orchestration_nodes")
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+async def _update_evidence_record(
+    evidence_id: str,
+    status: str,
+    extracted_data: Optional[Dict[str, Any]] = None,
+    confidence: float = 1.0,
+    provider_mode: str = "LOCAL DEMO / MOCK",
+    error_message: Optional[str] = None
+):
+    """Persists structured extraction results, status, confidence, and provider mode to Evidence table."""
+    if not evidence_id:
+        return
+    try:
+        async with AsyncSessionLocal() as db:
+            ev = await db.get(Evidence, evidence_id)
+            if ev:
+                ev.extraction_status = status
+                if extracted_data is not None:
+                    ev.extracted_data = extracted_data
+                ev.confidence = confidence
+                ev.provider_mode = provider_mode
+                ev.error_message = error_message
+                await db.commit()
+    except Exception as e:
+        logger.warning(f"Could not persist evidence record for {evidence_id}: {e}")
+
 
 def _make_stage_entry(state: FraudGraphState, stage_name: str, detail: str = "") -> List[Dict[str, Any]]:
     elapsed = round(time.time() - state.get("_start_time", time.time()), 2)
@@ -134,33 +161,68 @@ async def document_analysis(state: FraudGraphState) -> Dict[str, Any]:
     llm_doc_analyses: Dict[str, Any] = {}
 
     llm = get_llm_client()
+    storage_service = get_storage_service()
 
     for ev in evidence_items:
         doc_t = ev.get("document_type")
+        ev_id = ev.get("id", "")
         if doc_t in ["claim_form", "repair_estimate", "invoice", "police_report"]:
-            fpath = Path(ev.get("stored_path", ""))
-
-            # 1. Deterministic extraction & sanitization
-            extracted, conf, injected = document_agent.extract_document(fpath, doc_t, claim_data)
-            extracted_docs[doc_t] = extracted
-
-            # 2. LLM unstructured document understanding
-            raw_text = ""
-            if fpath.exists():
-                try:
-                    raw_text = fpath.read_text(encoding="utf-8", errors="ignore")
-                except Exception:
-                    raw_text = str(extracted)
-            else:
-                raw_text = str(extracted)
-
+            stored_path = ev.get("stored_path", "")
+            fname = ev.get("filename", f"{doc_t}.json")
+            content_bytes = b""
             try:
-                llm_analysis = await llm.analyze_document(raw_text, doc_t, claim_data)
-                llm_doc_analyses[doc_t] = llm_analysis.model_dump()
-                if llm_analysis.prompt_injection_warning:
-                    injected = True
+                content_bytes = await storage_service.read_evidence(stored_path)
             except Exception as e:
-                logger.warning(f"LLM doc analysis warning on {doc_t}: {e}")
+                logger.warning(f"Failed to read evidence file {stored_path}: {e}")
+                await _update_evidence_record(
+                    evidence_id=ev_id,
+                    status="FAILED",
+                    error_message=f"Storage read error: {e}",
+                    provider_mode=llm.provider_name
+                )
+
+            extracted = {}
+            conf = 0.85
+            injected = False
+
+            if content_bytes:
+                try:
+                    # 1. Deterministic extraction via temporary file for legacy parser
+                    with temporary_evidence_file(content_bytes, fname) as tmp_path:
+                        extracted, conf, injected = document_agent.extract_document(tmp_path, doc_t, claim_data)
+                    extracted_docs[doc_t] = extracted
+
+                    # 2. LLM unstructured document understanding
+                    try:
+                        raw_text = content_bytes.decode("utf-8", errors="ignore")
+                    except Exception:
+                        raw_text = str(extracted)
+
+                    try:
+                        llm_analysis = await llm.analyze_document(raw_text, doc_t, claim_data)
+                        llm_doc_analyses[doc_t] = llm_analysis.model_dump()
+                        if llm_analysis.prompt_injection_warning:
+                            injected = True
+                    except Exception as e:
+                        logger.warning(f"LLM doc analysis warning on {doc_t}: {e}")
+
+                    # 3. Persist successful evidence extraction
+                    await _update_evidence_record(
+                        evidence_id=ev_id,
+                        status="COMPLETED",
+                        extracted_data=extracted,
+                        confidence=conf,
+                        provider_mode=llm.provider_name,
+                        error_message=None
+                    )
+                except Exception as e:
+                    logger.warning(f"Error extracting document {fname} ({e}); degrading gracefully.")
+                    await _update_evidence_record(
+                        evidence_id=ev_id,
+                        status="FAILED",
+                        error_message=str(e),
+                        provider_mode=llm.provider_name
+                    )
 
             if injected:
                 sig = {
@@ -169,11 +231,11 @@ async def document_analysis(state: FraudGraphState) -> Dict[str, Any]:
                     "severity": "CRITICAL",
                     "score_impact": 40.0,
                     "description": "Uploaded document contained adversarial prompt injection instructions disguised as claim text.",
-                    "evidence_refs": [ev.get("id", "")],
-                    "metadata": {"filename": ev.get("filename", "")}
+                    "evidence_refs": [ev_id],
+                    "metadata": {"filename": fname}
                 }
                 doc_signals.append(sig)
-                injections.append({"document": ev.get("filename"), "evidence_id": ev.get("id")})
+                injections.append({"document": fname, "evidence_id": ev_id})
 
     return {
         "document_extractions": extracted_docs,
@@ -193,25 +255,87 @@ async def vision_analysis(state: FraudGraphState) -> Dict[str, Any]:
     photo_extractions: List[Dict[str, Any]] = []
     vision_insights: List[Dict[str, Any]] = []
 
+    llm = get_llm_client()
+    storage_service = get_storage_service()
+
     for ev in evidence_items:
         doc_t = ev.get("document_type")
+        ev_id = ev.get("id", "")
         if doc_t in ["damage_photo", "photo", "image"]:
-            fpath = Path(ev.get("stored_path", ""))
-            photo_ext = vision_agent.analyze_photo(fpath, claim_data)
-            photo_dict = photo_ext.model_dump()
-            photo_extractions.append(photo_dict)
-            vision_insights.append({
-                "damage_severity": photo_dict.get("damage_severity"),
-                "damaged_zones": photo_dict.get("damaged_zones"),
-                "confidence": photo_dict.get("confidence")
-            })
+            stored_path = ev.get("stored_path", "")
+            fname = ev.get("filename", "damage_photo.jpg")
+            mime_t = ev.get("mime_type", "image/jpeg")
+
+            img_bytes = b""
+            try:
+                img_bytes = await storage_service.read_evidence(stored_path)
+            except Exception as e:
+                logger.warning(f"Storage read failure for image {stored_path}: {e}")
+
+            if not img_bytes:
+                # If evidence file not yet on disk/blob in simulated scenarios, check if local file exists
+                if Path(stored_path).exists():
+                    try:
+                        img_bytes = Path(stored_path).read_bytes()
+                    except Exception:
+                        pass
+                if not img_bytes:
+                    img_bytes = b"EMPTY_IMAGE_BYTES_PLACEHOLDER"
+
+            photo_dict = None
+            try:
+                photo_ext = await llm.analyze_image(
+                    image_bytes=img_bytes,
+                    mime_type=mime_t,
+                    claim_meta=claim_data,
+                    filename=fname
+                )
+                photo_dict = photo_ext.model_dump()
+                photo_extractions.append(photo_dict)
+                vision_insights.append({
+                    "damage_severity": photo_dict.get("overall_visual_damage_severity"),
+                    "damaged_zones": [f.get("component") for f in photo_dict.get("findings", [])],
+                    "confidence": photo_dict.get("confidence")
+                })
+
+                # Persist successful evidence extraction
+                await _update_evidence_record(
+                    evidence_id=ev_id,
+                    status="COMPLETED",
+                    extracted_data=photo_dict,
+                    confidence=photo_dict.get("confidence", 0.9),
+                    provider_mode=llm.provider_name,
+                    error_message=None
+                )
+            except Exception as e:
+                logger.warning(f"Vision analysis failed for {fname} ({e}); degrading gracefully.")
+                # Graceful degradation fallback to local mock parser
+                try:
+                    fallback_ext = vision_agent.analyze_photo(Path(fname), claim_data)
+                    fallback_dict = fallback_ext.model_dump()
+                    photo_extractions.append(fallback_dict)
+                    vision_insights.append({
+                        "damage_severity": fallback_dict.get("overall_visual_damage_severity"),
+                        "damaged_zones": [f.get("component") for f in fallback_dict.get("findings", [])],
+                        "confidence": fallback_dict.get("confidence")
+                    })
+                except Exception:
+                    pass
+
+                # Persist FAILED status without crashing investigation
+                await _update_evidence_record(
+                    evidence_id=ev_id,
+                    status="FAILED",
+                    error_message=str(e),
+                    provider_mode=llm.provider_name
+                )
 
     return {
         "photo_extractions": photo_extractions,
         "vision_insights": vision_insights,
         "vision_signals": [],
         "current_stage": "Vision Analysis",
-        "stage_history": _make_stage_entry(state, "Vision Analysis", "Executing Vision Agent for crash damage classification")
+        "stage_history": _make_stage_entry(state, "Vision Analysis", "Executing Multimodal Vision Agent for crash damage classification")
     }
 
 # --- Node 5: historical_analysis (Parallel Branch C) ---
@@ -227,13 +351,22 @@ async def historical_analysis(state: FraudGraphState) -> Dict[str, Any]:
     est_ext = state.get("document_extractions", {}).get("repair_estimate")
 
     if not inv_ext or not est_ext:
+        storage_service = get_storage_service()
         for ev in state.get("evidence_items", []):
             dt = ev.get("document_type")
-            fpath = Path(ev.get("stored_path", ""))
-            if dt == "invoice" and not inv_ext:
-                inv_ext, _, _ = document_agent.extract_document(fpath, dt, claim_data)
-            elif dt == "repair_estimate" and not est_ext:
-                est_ext, _, _ = document_agent.extract_document(fpath, dt, claim_data)
+            stored_p = ev.get("stored_path", "")
+            fname = ev.get("filename", f"{dt}.json")
+            if dt in ["invoice", "repair_estimate"]:
+                try:
+                    content_bytes = await storage_service.read_evidence(stored_p)
+                    with temporary_evidence_file(content_bytes, fname) as tmp_path:
+                        ext, _, _ = document_agent.extract_document(tmp_path, dt, claim_data)
+                        if dt == "invoice" and not inv_ext:
+                            inv_ext = ext
+                        elif dt == "repair_estimate" and not est_ext:
+                            est_ext = ext
+                except Exception as e:
+                    logger.warning(f"Error loading {dt} in historical_analysis: {e}")
 
     async with AsyncSessionLocal() as db:
         raw_hist = await historical_agent.analyze_claim_patterns(
@@ -257,12 +390,19 @@ async def rules_analysis(state: FraudGraphState) -> Dict[str, Any]:
 
     # If document_extractions wasn't merged yet, populate from evidence items
     if not extracted_docs:
+        storage_service = get_storage_service()
         for ev in state.get("evidence_items", []):
             dt = ev.get("document_type")
-            fpath = Path(ev.get("stored_path", ""))
+            stored_p = ev.get("stored_path", "")
+            fname = ev.get("filename", f"{dt}.json")
             if dt in ["claim_form", "repair_estimate", "invoice", "police_report"]:
-                extracted, _, _ = document_agent.extract_document(fpath, dt, claim_data)
-                extracted_docs[dt] = extracted
+                try:
+                    content_bytes = await storage_service.read_evidence(stored_p)
+                    with temporary_evidence_file(content_bytes, fname) as tmp_path:
+                        extracted, _, _ = document_agent.extract_document(tmp_path, dt, claim_data)
+                        extracted_docs[dt] = extracted
+                except Exception as e:
+                    logger.warning(f"Error loading {dt} in rules_analysis: {e}")
 
     stub = _ClaimStub(claim_data, claim_id)
     rule_signals = rules_engine.evaluate_rules(stub, extracted_docs, evidence_id_map)
@@ -283,12 +423,19 @@ async def verification(state: FraudGraphState) -> Dict[str, Any]:
 
     # Fallback load if needed
     if not extracted_docs:
+        storage_service = get_storage_service()
         for ev in state.get("evidence_items", []):
             dt = ev.get("document_type")
-            fpath = Path(ev.get("stored_path", ""))
+            stored_p = ev.get("stored_path", "")
+            fname = ev.get("filename", f"{dt}.json")
             if dt in ["claim_form", "repair_estimate", "invoice", "police_report"]:
-                extracted, _, _ = document_agent.extract_document(fpath, dt, claim_data)
-                extracted_docs[dt] = extracted
+                try:
+                    content_bytes = await storage_service.read_evidence(stored_p)
+                    with temporary_evidence_file(content_bytes, fname) as tmp_path:
+                        extracted, _, _ = document_agent.extract_document(tmp_path, dt, claim_data)
+                        extracted_docs[dt] = extracted
+                except Exception as e:
+                    logger.warning(f"Error loading {dt} in verification: {e}")
 
     stub = _ClaimStub(claim_data, claim_id)
 
@@ -334,6 +481,20 @@ async def llm_investigation_synthesis(state: FraudGraphState) -> Dict[str, Any]:
     doc_signals = state.get("document_signals", [])
     prompt_injected = len(state.get("prompt_injections_detected", [])) > 0
 
+    all_current_signals = rule_signals + historical_signals + verification_signals + doc_signals
+
+    # Get deterministic risk evaluation from state or compute preview if called standalone
+    det_score = state.get("risk_score")
+    det_level = state.get("risk_level")
+    requires_siu = state.get("requires_human_review")
+
+    if det_score is None or det_level in [None, "UNASSESSED"]:
+        claimed_amt = float(claim_data.get("claimed_amount", 0.0))
+        computed_score, computed_level, _, _, _ = risk_engine.calculate_risk(all_current_signals, claimed_amt)
+        det_score = computed_score
+        det_level = computed_level
+        requires_siu = det_level in ["HIGH", "CRITICAL"]
+
     llm = get_llm_client()
     synthesis = None
     summary_text = ""
@@ -346,7 +507,10 @@ async def llm_investigation_synthesis(state: FraudGraphState) -> Dict[str, Any]:
             verification_signals=verification_signals + doc_signals,
             document_insights=state.get("document_insights", {}),
             vision_insights=state.get("vision_insights", []),
-            prompt_injected=prompt_injected
+            prompt_injected=prompt_injected,
+            deterministic_risk_score=det_score,
+            deterministic_risk_level=det_level,
+            requires_human_review=requires_siu
         )
         synthesis = synthesis_obj.model_dump()
         summary_text = synthesis_obj.executive_summary

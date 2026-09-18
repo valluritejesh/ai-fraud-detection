@@ -62,13 +62,14 @@ class Settings(BaseSettings):
     # Azure AI Configuration (Optional / Local Fallback Enabled by Default)
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_KEY: str = ""
-    AZURE_OPENAI_DEPLOYMENT: str = "gpt-4o"
+    AZURE_OPENAI_DEPLOYMENT: str = "fraudguard-gpt56"
+    AZURE_OPENAI_API_VERSION: str = "2024-10-21"
     AZURE_DOC_INTEL_ENDPOINT: str = ""
     AZURE_DOC_INTEL_KEY: str = ""
 
-    # LLM Service Configuration (Gemini, OpenRouter, or Local Mock)
-    LLM_PROVIDER: str = "mock"  # "gemini", "openrouter", "mock"
-    LLM_MODEL: str = "gemini-2.5-flash"
+    # LLM Service Configuration (azure_openai, gemini, openrouter, or mock)
+    LLM_PROVIDER: str = "mock"  # "azure_openai", "gemini", "openrouter", "mock"
+    LLM_MODEL: str = "gpt-5.6-sol"
     LLM_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"

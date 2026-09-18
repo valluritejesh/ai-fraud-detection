@@ -1,6 +1,8 @@
 import abc
 import hashlib
 import logging
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 from app.core.config import settings
@@ -55,9 +57,16 @@ class LocalEvidenceStorage(EvidenceStorageService):
 
     def _resolve_path(self, identifier: str) -> Path:
         p = Path(identifier)
+        if p.exists():
+            return p
         if p.is_absolute():
             return p
-        return self.base_dir / identifier
+        candidate = self.base_dir / identifier
+        if candidate.exists():
+            return candidate
+        if (Path.cwd() / identifier).exists():
+            return Path.cwd() / identifier
+        return candidate
 
     async def save_evidence(
         self,
@@ -242,3 +251,24 @@ def get_storage_service() -> EvidenceStorageService:
             logger.warning(f"AzureBlobEvidenceStorage init failed ({e}); falling back to LocalEvidenceStorage.")
             return LocalEvidenceStorage()
     return LocalEvidenceStorage()
+
+
+@contextmanager
+def temporary_evidence_file(file_bytes: bytes, filename: str):
+    """
+    Context manager creating a temporary file on the local filesystem from evidence bytes.
+    Guarantees deletion in finally block so legacy parsers requiring pathlib.Path
+    can safely operate without leaking files.
+    """
+    suffix = Path(filename).suffix or ".tmp"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = Path(tmp.name)
+    try:
+        yield tmp_path
+    finally:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception as e:
+            logger.warning(f"Error removing temporary evidence file {tmp_path}: {e}")

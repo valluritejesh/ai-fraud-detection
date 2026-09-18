@@ -63,10 +63,10 @@ def create_fraud_graph():
 
     # Downstream Synthesis & Governance
     builder.add_edge("rules_analysis", "verification")
-    builder.add_edge("verification", "llm_investigation_synthesis")
-    builder.add_edge("llm_investigation_synthesis", "risk_calculation")
+    builder.add_edge("verification", "risk_calculation")
     builder.add_edge("risk_calculation", "risk_routing")
-    builder.add_edge("risk_routing", "human_review")
+    builder.add_edge("risk_routing", "llm_investigation_synthesis")
+    builder.add_edge("llm_investigation_synthesis", "human_review")
     builder.add_edge("human_review", "audit")
     builder.add_edge("audit", "claims_sync")
     builder.add_edge("claims_sync", END)

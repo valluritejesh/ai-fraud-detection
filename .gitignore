@@ -16,3 +16,8 @@ chrome_temp/
 edge_temp/
 *.tsbuildinfo
 
+db-password.txt
+storage-connection.txt
+azure-openapi.json
+gemini-key.txt
+frontend/tsconfig.tsbuildinfo
